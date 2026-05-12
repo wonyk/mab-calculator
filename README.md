@@ -91,3 +91,7 @@ https://<your-github-username>.github.io/<your-repository-name>/
 ```
 
 No build step is required.
+
+## Important Note
+
+This is an experimental site vibe-coded using Codex.
