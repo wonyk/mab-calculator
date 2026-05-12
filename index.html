@@ -1,0 +1,94 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MAB Goal Calculator</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <main class="app-shell">
+    <section class="hero">
+      <p class="eyebrow">Monthly Average Balance</p>
+      <h1>MAB goal calculator</h1>
+      <p class="intro">
+        Enter your current MAB data as of yesterday, compare it with last month,
+        and estimate how much to deposit or withdraw from your chosen transaction date onward to finish
+        a little above a 500 increase.
+      </p>
+    </section>
+
+    <section class="card">
+      <form id="mab-form" class="calculator-form">
+        <label>
+          <span>Month</span>
+          <select id="month" name="month" required></select>
+        </label>
+
+        <label>
+          <span>Effective date of current values</span>
+          <input id="effectiveDate" name="effectiveDate" type="date" required>
+        </label>
+
+        <label>
+          <span>Current MAB (as of yesterday)</span>
+          <input id="currentMab" name="currentMab" type="number" min="0" step="0.01" value="0" required>
+        </label>
+
+        <label>
+          <span>MAB increase vs previous month</span>
+          <input id="mabIncrease" name="mabIncrease" type="number" step="0.01" value="0" required>
+        </label>
+
+        <label>
+          <span>Current balance</span>
+          <input id="currentBalance" name="currentBalance" type="number" min="0" step="0.01" value="0" required>
+        </label>
+
+        <label>
+          <span>Target increase</span>
+          <input id="goalIncrease" name="goalIncrease" type="number" min="0" step="0.01" value="500">
+        </label>
+
+        <label class="full-width">
+          <span>Transaction date for this move</span>
+          <input id="actionDate" name="actionDate" type="date" required>
+        </label>
+
+        <section class="planned-panel">
+          <div class="planned-header">
+            <div>
+              <strong>Planned transfers</strong>
+              <p>Add any deposits or withdrawals you already expect from the chosen transaction date through the end of the month.</p>
+            </div>
+            <button id="addTransferButton" class="secondary-button" type="button">Add transfer</button>
+          </div>
+          <div id="plannedTransfers" class="planned-transfers"></div>
+        </section>
+
+        <button type="submit">Calculate plan</button>
+      </form>
+    </section>
+
+    <section id="results" class="card results" aria-live="polite">
+      <div class="placeholder">
+        Enter your month, the effective date of the values you have, current MAB,
+        MAB increase versus last month, and current balance.
+      </div>
+    </section>
+  </main>
+
+  <div id="mathModal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="mathModalTitle">
+    <div class="modal-backdrop" data-close-modal="true"></div>
+    <section class="modal-panel">
+      <button id="closeModalButton" class="modal-close" type="button" aria-label="Close calculation details">
+        Close
+      </button>
+      <h2 id="mathModalTitle">Calculation breakdown</h2>
+      <div id="mathBreakdown" class="math-breakdown"></div>
+    </section>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+</html>
