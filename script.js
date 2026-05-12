@@ -104,13 +104,55 @@ function getMinimumSelectableDay() {
   return selectedMonth === currentMonthIndex ? currentDay : 1;
 }
 
+function clearElement(element) {
+  element.replaceChildren();
+}
+
+function createElement(tagName, options = {}) {
+  const element = document.createElement(tagName);
+
+  if (options.className) {
+    element.className = options.className;
+  }
+  if (options.text) {
+    element.textContent = options.text;
+  }
+  if (options.htmlFor) {
+    element.htmlFor = options.htmlFor;
+  }
+  if (options.type) {
+    element.type = options.type;
+  }
+  if (options.value !== undefined) {
+    element.value = options.value;
+  }
+  if (options.min !== undefined) {
+    element.min = String(options.min);
+  }
+  if (options.max !== undefined) {
+    element.max = String(options.max);
+  }
+  if (options.step !== undefined) {
+    element.step = String(options.step);
+  }
+  if (options.required) {
+    element.required = true;
+  }
+  if (options.name) {
+    element.name = options.name;
+  }
+
+  return element;
+}
+
 function renderEmptyTransfers() {
   if (plannedTransfers.children.length === 0) {
     const minimumDay = getMinimumSelectableDay();
     const emptyText = minimumDay >= getSelectedDaysInMonth()
       ? "No transaction days remain in this month."
       : "No planned transfers added yet.";
-    plannedTransfers.innerHTML = `<p class="empty-transfers">${emptyText}</p>`;
+    const message = createElement("p", { className: "empty-transfers", text: emptyText });
+    plannedTransfers.replaceChildren(message);
   }
 }
 
@@ -121,29 +163,49 @@ function createTransferRow() {
   }
 
   if (plannedTransfers.querySelector(".empty-transfers")) {
-    plannedTransfers.innerHTML = "";
+    clearElement(plannedTransfers);
   }
 
-  const row = document.createElement("div");
-  row.className = "planned-transfer-row";
-  row.innerHTML = `
-    <label>
-      <span>Transaction day</span>
-      <input class="transfer-day" type="number" min="2" step="1" required>
-    </label>
-    <label>
-      <span>Type</span>
-      <select class="transfer-type">
-        <option value="deposit">Deposit</option>
-        <option value="withdrawal">Withdrawal</option>
-      </select>
-    </label>
-    <label>
-      <span>Amount</span>
-      <input class="transfer-amount" type="number" min="0" step="0.01" value="0" required>
-    </label>
-    <button class="remove-transfer secondary-button" type="button">Remove</button>
-  `;
+  const row = createElement("div", { className: "planned-transfer-row" });
+
+  const dayLabel = createElement("label");
+  const dayText = createElement("span", { text: "Transaction day" });
+  const dayInput = createElement("input", {
+    className: "transfer-day",
+    type: "number",
+    min: 2,
+    step: 1,
+    required: true,
+  });
+  dayLabel.append(dayText, dayInput);
+
+  const typeLabel = createElement("label");
+  const typeText = createElement("span", { text: "Type" });
+  const typeSelect = createElement("select", { className: "transfer-type" });
+  const depositOption = createElement("option", { text: "Deposit", value: "deposit" });
+  const withdrawalOption = createElement("option", { text: "Withdrawal", value: "withdrawal" });
+  typeSelect.append(depositOption, withdrawalOption);
+  typeLabel.append(typeText, typeSelect);
+
+  const amountLabel = createElement("label");
+  const amountText = createElement("span", { text: "Amount" });
+  const amountInput = createElement("input", {
+    className: "transfer-amount",
+    type: "number",
+    min: 0,
+    step: 0.01,
+    value: "0",
+    required: true,
+  });
+  amountLabel.append(amountText, amountInput);
+
+  const removeButton = createElement("button", {
+    className: "remove-transfer secondary-button",
+    type: "button",
+    text: "Remove",
+  });
+
+  row.append(dayLabel, typeLabel, amountLabel, removeButton);
 
   plannedTransfers.append(row);
   syncTransferRowLimits(row);
@@ -346,28 +408,37 @@ function renderResults(plan) {
     actionText = `Deposit ${formatMoney(plan.todayTransferAmount)} on ${formatDisplayDate(plan.actionDate)}.`;
   }
 
-  results.innerHTML = `
-    <div class="results-grid">
-      <article class="primary-result">
-        <strong>${actionVerb} amount</strong>
-        <span class="primary-amount ${amountClass}">${amountText}</span>
-        <p class="result-caption">${actionText}</p>
-      </article>
-      <div class="result-actions">
-        <button id="showDetailsButton" class="details-button" type="button">Show calculation details</button>
-      </div>
-      <article class="summary">
-        <strong>Notes</strong>
-        <p>This uses values effective on ${formatDisplayDate(plan.effectiveDate)}.</p>
-        <p>${plan.plannedItems.length > 0
-          ? `Future transfers included: ${plan.plannedItems.map((item) => `${item.type === "deposit" ? "deposit" : "withdraw"} ${formatMoney(item.amount)} on day ${item.day}`).join(", ")}.`
-          : "No planned transfers were included in this calculation."}</p>
-        <p class="note">Chosen transaction date: ${formatDisplayDate(plan.actionDate)}.</p>
-      </article>
-    </div>
-  `;
+  const grid = createElement("div", { className: "results-grid" });
+  const primaryResult = createElement("article", { className: "primary-result" });
+  primaryResult.append(
+    createElement("strong", { text: `${actionVerb} amount` }),
+    createElement("span", { className: `primary-amount ${amountClass}`, text: amountText }),
+    createElement("p", { className: "result-caption", text: actionText }),
+  );
 
-  const showDetailsButton = document.querySelector("#showDetailsButton");
+  const actions = createElement("div", { className: "result-actions" });
+  const showDetailsButton = createElement("button", {
+    className: "details-button",
+    type: "button",
+    text: "Show calculation details",
+  });
+  showDetailsButton.id = "showDetailsButton";
+  actions.append(showDetailsButton);
+
+  const summary = createElement("article", { className: "summary" });
+  const plannedSummary = plan.plannedItems.length > 0
+    ? `Future transfers included: ${plan.plannedItems.map((item) => `${item.type === "deposit" ? "deposit" : "withdraw"} ${formatMoney(item.amount)} on day ${item.day}`).join(", ")}.`
+    : "No planned transfers were included in this calculation.";
+  summary.append(
+    createElement("strong", { text: "Notes" }),
+    createElement("p", { text: `This uses values effective on ${formatDisplayDate(plan.effectiveDate)}.` }),
+    createElement("p", { text: plannedSummary }),
+    createElement("p", { className: "note", text: `Chosen transaction date: ${formatDisplayDate(plan.actionDate)}.` }),
+  );
+
+  grid.append(primaryResult, actions, summary);
+  results.replaceChildren(grid);
+
   showDetailsButton.addEventListener("click", () => {
     renderMathBreakdown(plan);
     openMathModal();
@@ -375,64 +446,81 @@ function renderResults(plan) {
 }
 
 function renderMathBreakdown(plan) {
-  const plannedTransferList = plan.plannedItems.length > 0
-    ? `<ul>${plan.plannedItems.map((item) => `<li>${item.type === "deposit" ? "Deposit" : "Withdrawal"} ${formatMoney(item.amount)} on day ${item.day} affects ${item.activeDays} day(s).</li>`).join("")}</ul>`
-    : "<p>No planned transfers were added.</p>";
   const actionFormula = plan.actionContributionDays > 0
     ? `(${formatMoney(plan.requiredContributionFromToday)} - ${formatMoney(plan.baseContributionWithoutToday)} - ${formatMoney(plan.plannedContribution)}) / ${plan.actionContributionDays} = ${formatMoney(plan.todayTransferAmount)}`
     : "No further in-month contribution is possible because the chosen transaction date is too late.";
+  clearElement(mathBreakdown);
 
-  mathBreakdown.innerHTML = `
-    <article class="math-step">
-      <strong>1. Previous month MAB</strong>
-      <pre>${formatMoney(plan.currentMab)} - ${formatMoney(plan.mabIncrease)} = ${formatMoney(plan.previousMonthMab)}</pre>
-    </article>
-    <article class="math-step">
-      <strong>2. Target MAB</strong>
-      <pre>${formatMoney(plan.previousMonthMab)} + ${formatMoney(plan.goalIncrease)} = ${formatMoney(plan.targetMab)}</pre>
-    </article>
-    <article class="math-step">
-      <strong>3. Planned MAB with small buffer</strong>
-      <pre>${formatMoney(plan.targetMab)} + ${formatMoney(plan.bufferAmount)} = ${formatMoney(plan.bufferedTargetMab)}</pre>
-    </article>
-    <article class="math-step">
-      <strong>4. Balance needed across the full month</strong>
-      <pre>${formatMoney(plan.bufferedTargetMab)} x ${plan.daysInMonth} days = ${formatMoney(plan.totalBalanceNeeded)}</pre>
-    </article>
-    <article class="math-step">
-      <strong>5. Balance already accumulated through the effective date</strong>
-      <pre>${formatMoney(plan.currentMab)} x ${plan.dataDay} days = ${formatMoney(plan.totalAccumulatedSoFar)}</pre>
-    </article>
-    <article class="math-step">
-      <strong>6. Base contribution from keeping the current balance unchanged</strong>
-      <pre>${formatMoney(plan.currentBalance)} x ${plan.remainingDays} days = ${formatMoney(plan.baseContributionWithoutToday)}</pre>
-    </article>
-    <article class="math-step">
-      <strong>7. Contribution from planned transfers</strong>
-      <pre>${formatMoney(plan.plannedContribution)}</pre>
-      ${plannedTransferList}
-    </article>
-    <article class="math-step">
-      <strong>8. Additional amount needed from the effective date onward</strong>
-      <pre>${formatMoney(plan.totalBalanceNeeded)} - ${formatMoney(plan.totalAccumulatedSoFar)} = ${formatMoney(plan.requiredContributionFromToday)}</pre>
-    </article>
-    <article class="math-step">
-      <strong>9. Amount to move on the chosen transaction date</strong>
-      <pre>${actionFormula}</pre>
-      <p>
-        ${plan.todayTransferAmount > 0
-          ? `Deposit ${formatMoney(plan.todayTransferAmount)} on ${formatDisplayDate(plan.actionDate)}.`
-          : plan.todayTransferAmount < 0
-            ? `Withdraw ${formatMoney(Math.abs(plan.todayTransferAmount))} on ${formatDisplayDate(plan.actionDate)}.`
-            : "No transfer is needed."}
-      </p>
-    </article>
-    <article class="math-step">
-      <strong>10. Target balance after the chosen action</strong>
-      <pre>${formatMoney(plan.currentBalance)} + ${formatMoney(plan.todayTransferAmount)} = ${formatMoney(plan.targetBalanceToday)}</pre>
-      <p>Transaction date: ${formatDisplayDate(plan.actionDate)}.</p>
-    </article>
-  `;
+  function appendStep(title, codeText, paragraphText, listItems = []) {
+    const step = createElement("article", { className: "math-step" });
+    step.append(
+      createElement("strong", { text: title }),
+      createElement("pre", { text: codeText }),
+    );
+
+    if (paragraphText) {
+      step.append(createElement("p", { text: paragraphText }));
+    }
+
+    if (listItems.length > 0) {
+      const list = createElement("ul");
+      listItems.forEach((itemText) => {
+        list.append(createElement("li", { text: itemText }));
+      });
+      step.append(list);
+    }
+
+    mathBreakdown.append(step);
+  }
+
+  appendStep(
+    "1. Previous month MAB",
+    `${formatMoney(plan.currentMab)} - ${formatMoney(plan.mabIncrease)} = ${formatMoney(plan.previousMonthMab)}`,
+  );
+  appendStep(
+    "2. Target MAB",
+    `${formatMoney(plan.previousMonthMab)} + ${formatMoney(plan.goalIncrease)} = ${formatMoney(plan.targetMab)}`,
+  );
+  appendStep(
+    "3. Planned MAB with small buffer",
+    `${formatMoney(plan.targetMab)} + ${formatMoney(plan.bufferAmount)} = ${formatMoney(plan.bufferedTargetMab)}`,
+  );
+  appendStep(
+    "4. Balance needed across the full month",
+    `${formatMoney(plan.bufferedTargetMab)} x ${plan.daysInMonth} days = ${formatMoney(plan.totalBalanceNeeded)}`,
+  );
+  appendStep(
+    "5. Balance already accumulated through the effective date",
+    `${formatMoney(plan.currentMab)} x ${plan.dataDay} days = ${formatMoney(plan.totalAccumulatedSoFar)}`,
+  );
+  appendStep(
+    "6. Base contribution from keeping the current balance unchanged",
+    `${formatMoney(plan.currentBalance)} x ${plan.remainingDays} days = ${formatMoney(plan.baseContributionWithoutToday)}`,
+  );
+  appendStep(
+    "7. Contribution from planned transfers",
+    `${formatMoney(plan.plannedContribution)}`,
+    plan.plannedItems.length === 0 ? "No planned transfers were added." : "",
+    plan.plannedItems.map((item) => `${item.type === "deposit" ? "Deposit" : "Withdrawal"} ${formatMoney(item.amount)} on day ${item.day} affects ${item.activeDays} day(s).`),
+  );
+  appendStep(
+    "8. Additional amount needed from the effective date onward",
+    `${formatMoney(plan.totalBalanceNeeded)} - ${formatMoney(plan.totalAccumulatedSoFar)} = ${formatMoney(plan.requiredContributionFromToday)}`,
+  );
+  appendStep(
+    "9. Amount to move on the chosen transaction date",
+    actionFormula,
+    plan.todayTransferAmount > 0
+      ? `Deposit ${formatMoney(plan.todayTransferAmount)} on ${formatDisplayDate(plan.actionDate)}.`
+      : plan.todayTransferAmount < 0
+        ? `Withdraw ${formatMoney(Math.abs(plan.todayTransferAmount))} on ${formatDisplayDate(plan.actionDate)}.`
+        : "No transfer is needed.",
+  );
+  appendStep(
+    "10. Target balance after the chosen action",
+    `${formatMoney(plan.currentBalance)} + ${formatMoney(plan.todayTransferAmount)} = ${formatMoney(plan.targetBalanceToday)}`,
+    `Transaction date: ${formatDisplayDate(plan.actionDate)}.`,
+  );
 }
 
 function openMathModal() {
@@ -492,6 +580,6 @@ form.addEventListener("submit", (event) => {
     closeMathModal();
   } catch (error) {
     closeMathModal();
-    results.innerHTML = `<div class="placeholder">${error.message}</div>`;
+    results.replaceChildren(createElement("div", { className: "placeholder", text: error.message }));
   }
 });
