@@ -37,9 +37,9 @@ Using those inputs, it:
 
 ## Files
 
-- [index.html](C:\Users\Keat\Desktop\Personal\mab-calculator\index.html) contains the page structure
-- [styles.css](C:\Users\Keat\Desktop\Personal\mab-calculator\styles.css) contains the styling
-- [script.js](C:\Users\Keat\Desktop\Personal\mab-calculator\script.js) contains the calculator logic
+- [index.html](./index.html) contains the page structure
+- [styles.css](./styles.css) contains the styling
+- [script.js](./script.js) contains the calculator logic
 
 ## How To Run
 
@@ -47,7 +47,7 @@ Because this is a plain HTML/CSS/JavaScript app, you can run it in either of the
 
 ### Option 1: Open directly
 
-Open [index.html](C:\Users\Keat\Desktop\Personal\mab-calculator\index.html) in a web browser.
+Open [index.html](./index.html) in a web browser.
 
 ### Option 2: Run a local server
 
@@ -69,3 +69,25 @@ http://127.0.0.1:4173
 - Planned transfers can be scheduled on any date from today through the end of the selected month.
 - If the chosen transaction date is too late in the month, the calculator will tell you that the goal can no longer be reached from that timing.
 - The app is fully client-side and does not store or send your data anywhere.
+
+## GitHub Pages Hosting
+
+This project can be hosted directly on GitHub Pages because it is a plain static HTML/CSS/JavaScript site.
+
+To publish it:
+
+1. Push this project to a GitHub repository.
+2. In GitHub, open `Settings` for the repository.
+3. Go to `Pages`.
+4. Under `Build and deployment`, choose `Deploy from a branch`.
+5. Select the branch you want to publish, usually `main`.
+6. Select the root folder `/`.
+7. Save the settings.
+
+After GitHub finishes deploying, your site will be available at:
+
+```text
+https://<your-github-username>.github.io/<your-repository-name>/
+```
+
+No build step is required.
