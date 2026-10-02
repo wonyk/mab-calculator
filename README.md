@@ -1,5 +1,7 @@
 # MAB Goal Calculator
 
+The application version is maintained in [VERSION](./VERSION). Completed checkpoints are committed locally, with version increments for application changes.
+
 This is a small browser-based calculator for estimating how much to deposit or withdraw so your Monthly Average Balance (MAB) ends the month slightly above your target increase.
 
 ## UOB Stash mode

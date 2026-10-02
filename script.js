@@ -244,16 +244,24 @@ function syncDates() {
   const daysInMonth = getDaysInMonth(selectedMonth);
   const currentEffectiveDate = parseInputDate(effectiveDateInput.value);
   const currentActionDate = parseInputDate(actionDateInput.value);
-  const defaultDate = selectedMonth === currentMonthIndex ? yesterday : buildMonthDate(selectedMonth, 1);
-  const nextDate = currentEffectiveDate || defaultDate;
-  const clampedDay = Math.min(nextDate.getDate(), daysInMonth);
   const precedingMonthEnd = buildMonthDate(selectedMonth, 0);
-  const syncedDate = nextDate.getTime() === precedingMonthEnd.getTime() ? precedingMonthEnd : buildMonthDate(selectedMonth, clampedDay);
-  const defaultActionDate = buildMonthDate(selectedMonth, Math.min(daysInMonth, getMinimumSelectableDay()));
-  const nextActionDate = currentActionDate || defaultActionDate;
-  const actionDay = Math.max(getMinimumSelectableDay(), Math.min(nextActionDate.getDate(), daysInMonth));
-  const syncedActionDate = buildMonthDate(selectedMonth, actionDay);
+  const monthEnd = buildMonthDate(selectedMonth, daysInMonth);
+  const defaultDate = selectedMonth === currentMonthIndex ? yesterday : precedingMonthEnd;
+  const latestEffectiveDate = selectedMonth === currentMonthIndex ? yesterday : addDays(monthEnd, -1);
+  const effectiveInMonth = currentEffectiveDate && currentEffectiveDate >= precedingMonthEnd && currentEffectiveDate <= monthEnd;
+  const syncedDate = effectiveInMonth && currentEffectiveDate <= latestEffectiveDate ? currentEffectiveDate : defaultDate;
+  const defaultActionDate = selectedMonth === currentMonthIndex ? now : buildMonthDate(selectedMonth, 1);
+  const minimumActionDate = addDays(syncedDate, 1);
+  const actionInMonth = currentActionDate && currentActionDate.getFullYear() === currentYear && currentActionDate.getMonth() === selectedMonth;
+  let syncedActionDate = actionInMonth ? currentActionDate : defaultActionDate;
+  if (syncedActionDate < minimumActionDate) syncedActionDate = minimumActionDate;
+  const minimumDayDate = buildMonthDate(selectedMonth, getMinimumSelectableDay());
+  if (syncedActionDate < minimumDayDate) syncedActionDate = minimumDayDate;
 
+  effectiveDateInput.min = formatDateForInput(precedingMonthEnd);
+  effectiveDateInput.max = formatDateForInput(latestEffectiveDate);
+  actionDateInput.min = formatDateForInput(minimumActionDate > minimumDayDate ? minimumActionDate : minimumDayDate);
+  actionDateInput.max = formatDateForInput(monthEnd);
   effectiveDateInput.value = formatDateForInput(syncedDate);
   actionDateInput.value = formatDateForInput(syncedActionDate);
 
@@ -557,10 +565,6 @@ effectiveDateInput.addEventListener("change", () => {
   syncDates();
 });
 actionDateInput.addEventListener("change", () => {
-  const actionDate = parseInputDate(actionDateInput.value);
-  if (actionDate) {
-    monthSelect.value = String(actionDate.getMonth());
-  }
   syncAllTransferRows();
 });
 addTransferButton.addEventListener("click", createTransferRow);
@@ -622,8 +626,7 @@ accountSelect.addEventListener("change", () => {
   syncAccount();
 });
 monthSelect.addEventListener("change", () => {
-  if (accountSelect.value === "uob-stash") setStashDates();
-  else syncMabInput();
+  syncMabInput();
 });
 effectiveDateInput.addEventListener("change", syncMabInput);
 
@@ -632,7 +635,7 @@ function setStashDates() {
   const calculationDate = month === currentMonthIndex ? now : buildMonthDate(month, 1);
   effectiveDateInput.value = formatDateForInput(addDays(calculationDate, -1));
   actionDateInput.value = formatDateForInput(calculationDate);
-  syncAllTransferRows();
+  syncDates();
   syncMabInput();
 }
 
