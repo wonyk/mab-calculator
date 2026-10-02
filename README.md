@@ -2,6 +2,24 @@
 
 This is a small browser-based calculator for estimating how much to deposit or withdraw so your Monthly Average Balance (MAB) ends the month slightly above your target increase.
 
+## UOB Stash mode
+
+Choose **UOB Stash (Singapore)** in the account selector, or open the same app with `?account=uob-stash` (for example `index.html?account=uob-stash`). OCBC remains the default.
+
+Stash uses the previous month’s MAB directly. It requires this month’s MAB to be at least the previous month’s, and above S$10,000 for bonus interest. The bonus-interest cap of S$100,000 does not cap the balance used for the month-to-month comparison. Stash starts with a S$50,000 previous-month MAB and balance. The editable MAB buffer defaults to S$1 above the previous month MAB, subject to conservative cent rounding.
+
+Stash defaults to calculating today using MAB known through yesterday. For a different selected month it starts on day 1. On day 1, the effective date is the previous month’s final day. Enter that completed month’s MAB in “Previous month’s MAB”; the current-month MAB input is hidden because no days have accumulated yet. For later withdrawals, change the effective and transaction dates and enter the current MAB through that effective date.
+
+There is no separate interest field. Base interest (0.05% p.a.) is credited on the last day of the month; the remaining bonus interest is credited at the beginning of the following month. Last month’s interest already credited is included in the current balance, and any credit reflected in the completed month is already included in that month’s MAB. Uncredited interest is not assumed; if needed, add it as a planned deposit on its actual posting day.
+
+The recommendation rounds withdrawals down and deposits up to cents and reserves money for planned withdrawals. It is conditional on the dated transfers entered, assumes no other balance changes, and concerns the selected month only. A reduced closing balance can require a top-up next month. Promotional or earmarked-fund conditions are outside scope. It does not estimate future interest automatically or promise a particular interest payout.
+
+Rules verified on 2 October 2026 against [UOB Stash](https://www.uob.com.sg/personal/save/savings-accounts/stash-account.page) and [UOB account terms](https://www.uob.com.sg/web-resources/personal/pdf/personal/save/tnc-cts.pdf), section 41.
+
+## Validation
+
+Run `node calculator.test.cjs` for financial edge cases including cent rounding, month lengths, month-end credits, first-day calculations, and liquidity limits.
+
 ## What It Does
 
 The calculator asks for:
@@ -13,7 +31,7 @@ The calculator asks for:
 - your current account balance
 - your target increase, which defaults to `500`
 - the date you plan to perform the deposit or withdrawal
-- any planned deposits or withdrawals from today through the end of the month
+- any planned deposits or withdrawals after the effective date through the end of the month
 
 Using those inputs, it:
 
@@ -21,7 +39,7 @@ Using those inputs, it:
 - calculates the target MAB for the current month
 - adds a small buffer above the target
 - works out one main amount to deposit or withdraw on your chosen transaction date
-- factors in any planned transfers you already expect from today through the end of the month
+- factors in any planned transfers you already expect after the effective date through the end of the month
 - warns you if the chosen transaction date is too late to affect the goal
 - can optionally show a detailed math breakdown when you click `Show calculation details`
 
@@ -30,10 +48,10 @@ Using those inputs, it:
 - The current MAB is accurate through the effective date you provide.
 - `Previous month MAB = current MAB - MAB increase vs previous month`.
 - The target is the previous month's MAB plus the target increase.
-- The app currently treats "a little over" the goal as `target + 10`.
+- OCBC uses a S$10 MAB buffer; Stash uses the editable buffer and S$10,000 bonus threshold.
 - The main recommendation is based on the transaction date you choose.
 - Any planned transfers are assumed to happen on the exact days you enter.
-- The chosen transaction date for the main move is separate from planned transfers, but it cannot be earlier than the effective date.
+- The chosen transaction date for the main move is separate from planned transfers, and it must be later than the effective date.
 
 ## Files
 

@@ -415,3 +415,7 @@ button:hover {
     flex-direction: column;
   }
 }
+
+label.hidden { display: none; }
+
+a { color: var(--accent); }

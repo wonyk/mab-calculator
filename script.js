@@ -9,7 +9,9 @@ const mathModal = document.querySelector("#mathModal");
 const closeModalButton = document.querySelector("#closeModalButton");
 const mathBreakdown = document.querySelector("#mathBreakdown");
 
-const now = new Date();
+const singaporeParts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Singapore", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
+const datePart = type => singaporeParts.find(part => part.type === type).value;
+const now = new Date(Number(datePart("year")), Number(datePart("month")) - 1, Number(datePart("day")));
 now.setHours(12, 0, 0, 0);
 const currentYear = now.getFullYear();
 const currentMonthIndex = now.getMonth();
@@ -101,7 +103,7 @@ function getSelectedDaysInMonth() {
 
 function getMinimumSelectableDay() {
   const selectedMonth = Number(monthSelect.value);
-  return selectedMonth === currentMonthIndex ? currentDay : 1;
+  return document.querySelector("#account").value === "uob-stash" ? 1 : selectedMonth === currentMonthIndex ? currentDay : 1;
 }
 
 function clearElement(element) {
@@ -148,7 +150,7 @@ function createElement(tagName, options = {}) {
 function renderEmptyTransfers() {
   if (plannedTransfers.children.length === 0) {
     const minimumDay = getMinimumSelectableDay();
-    const emptyText = minimumDay >= getSelectedDaysInMonth()
+    const emptyText = minimumDay > getSelectedDaysInMonth()
       ? "No transaction days remain in this month."
       : "No planned transfers added yet.";
     const message = createElement("p", { className: "empty-transfers", text: emptyText });
@@ -214,7 +216,9 @@ function createTransferRow() {
 function syncTransferRowLimits(row) {
   const dayInput = row.querySelector(".transfer-day");
   const daysInMonth = getSelectedDaysInMonth();
-  const minFutureDay = Math.min(daysInMonth, getMinimumSelectableDay());
+  const effective = parseInputDate(effectiveDateInput.value);
+  const historicalDay = effective && effective.getMonth() === Number(monthSelect.value) ? effective.getDate() : 0;
+  const minFutureDay = Math.min(daysInMonth, Math.max(getMinimumSelectableDay(), historicalDay + 1));
 
   dayInput.min = String(minFutureDay);
   dayInput.max = String(daysInMonth);
@@ -240,12 +244,11 @@ function syncDates() {
   const daysInMonth = getDaysInMonth(selectedMonth);
   const currentEffectiveDate = parseInputDate(effectiveDateInput.value);
   const currentActionDate = parseInputDate(actionDateInput.value);
-  const defaultDate = yesterday.getMonth() === selectedMonth
-    ? yesterday
-    : buildMonthDate(selectedMonth, daysInMonth);
+  const defaultDate = selectedMonth === currentMonthIndex ? yesterday : buildMonthDate(selectedMonth, 1);
   const nextDate = currentEffectiveDate || defaultDate;
   const clampedDay = Math.min(nextDate.getDate(), daysInMonth);
-  const syncedDate = buildMonthDate(selectedMonth, clampedDay);
+  const precedingMonthEnd = buildMonthDate(selectedMonth, 0);
+  const syncedDate = nextDate.getTime() === precedingMonthEnd.getTime() ? precedingMonthEnd : buildMonthDate(selectedMonth, clampedDay);
   const defaultActionDate = buildMonthDate(selectedMonth, Math.min(daysInMonth, getMinimumSelectableDay()));
   const nextActionDate = currentActionDate || defaultActionDate;
   const actionDay = Math.max(getMinimumSelectableDay(), Math.min(nextActionDate.getDate(), daysInMonth));
@@ -279,7 +282,8 @@ function calculatePlan(formData) {
   const monthIndex = Number(formData.get("month"));
   const effectiveDate = parseInputDate(formData.get("effectiveDate"));
   const actionDate = parseInputDate(formData.get("actionDate"));
-  const goalIncrease = Number(formData.get("goalIncrease") || 500);
+  const isStash = formData.get("account") === "uob-stash";
+  const goalIncrease = isStash ? 0 : Number(formData.get("goalIncrease") || 500);
   const currentMab = Number(formData.get("currentMab"));
   const mabIncrease = Number(formData.get("mabIncrease"));
   const currentBalance = Number(formData.get("currentBalance"));
@@ -291,7 +295,8 @@ function calculatePlan(formData) {
   if (!actionDate || Number.isNaN(actionDate.getTime())) {
     throw new Error("Enter a valid transaction date.");
   }
-  if (effectiveDate.getMonth() !== monthIndex || effectiveDate.getFullYear() !== currentYear) {
+  const isMonthStart = effectiveDate.getTime() === buildMonthDate(monthIndex, 0).getTime();
+  if (!isMonthStart && (effectiveDate.getMonth() !== monthIndex || effectiveDate.getFullYear() !== currentYear)) {
     throw new Error("The effective date must be within the selected month.");
   }
   if (actionDate.getMonth() !== monthIndex || actionDate.getFullYear() !== currentYear) {
@@ -300,18 +305,20 @@ function calculatePlan(formData) {
   if (actionDate.getDate() < getMinimumSelectableDay()) {
     throw new Error(`The transaction date must be between day ${getMinimumSelectableDay()} and day ${daysInMonth} for the selected month.`);
   }
-  if (actionDate < effectiveDate) {
-    throw new Error("The transaction date cannot be earlier than the effective date of your current values.");
+  if (actionDate <= effectiveDate) {
+    throw new Error("The transaction date must be later than the effective date of your current values.");
   }
 
-  const dataDay = effectiveDate.getDate();
-  if (dataDay < 1 || dataDay > daysInMonth) {
+  const dataDay = isMonthStart ? 0 : effectiveDate.getDate();
+  if (dataDay < 0 || dataDay > daysInMonth) {
     throw new Error(`Day must be between 1 and ${daysInMonth} for the selected month.`);
   }
-  const previousMonthMab = currentMab - mabIncrease;
+  const previousMonthMab = isStash ? Number(formData.get("previousMab")) : currentMab - mabIncrease;
+  const bufferInput = isStash ? Number(formData.get("buffer")) : 10;
+  if (![currentMab, currentBalance, previousMonthMab, goalIncrease, bufferInput].every(value => Number.isFinite(value) && value >= 0)) throw new Error("Balances, target and buffer must be valid non-negative amounts.");
   const targetMab = previousMonthMab + goalIncrease;
-  const bufferAmount = 10;
-  const bufferedTargetMab = targetMab + bufferAmount;
+  const bufferAmount = bufferInput;
+  const bufferedTargetMab = Math.max(targetMab + bufferAmount, isStash ? 10000.01 : 0);
   const differenceToGoal = currentMab - targetMab;
   const remainingDays = daysInMonth - dataDay;
   const totalBalanceNeeded = bufferedTargetMab * daysInMonth;
@@ -319,10 +326,10 @@ function calculatePlan(formData) {
   const actionContributionDays = Math.max(0, daysInMonth - actionDate.getDate() + 1);
 
   plannedItems.forEach((item) => {
-    if (item.day < getMinimumSelectableDay() || item.day > daysInMonth) {
-      throw new Error(`Planned transfer days must be between ${getMinimumSelectableDay()} and ${daysInMonth}.`);
+    if (!Number.isInteger(item.day) || item.day <= dataDay || item.day > daysInMonth) {
+      throw new Error(`Planned transfer days must be between ${dataDay + 1} and ${daysInMonth}.`);
     }
-    if (item.amount < 0) {
+    if (!Number.isFinite(item.amount) || item.amount < 0) {
       throw new Error("Planned transfer amounts cannot be negative.");
     }
   });
@@ -341,19 +348,16 @@ function calculatePlan(formData) {
   const baseContributionWithoutToday = currentBalance * remainingDays;
   const requiredContributionFromToday = totalBalanceNeeded - totalAccumulatedSoFar;
 
-  let todayTransferAmount = 0;
-  let cannotReachGoal = false;
-  if (actionContributionDays > 0) {
-    todayTransferAmount = (requiredContributionFromToday - baseContributionWithoutToday - plannedContribution) / actionContributionDays;
-  } else {
-    cannotReachGoal = true;
-  }
-  todayTransferAmount = Math.max(-currentBalance, todayTransferAmount);
-  const targetBalanceToday = Math.max(0, currentBalance + todayTransferAmount);
+  const solved = solveMabPlan({ days: daysInMonth, dataDay, actionDay: actionDate.getDate(), currentMab, currentBalance, target: bufferedTargetMab, transfers: plannedItems });
+  const todayTransferAmount = solved.move;
+  const cannotReachGoal = false;
+  const targetBalanceToday = solved.actionBalance;
   const totalPlannedTransferAmount = plannedTransfersWithImpact.reduce((sum, item) => sum + item.signedAmount, 0);
-  const projectedMonthEndBalance = targetBalanceToday + totalPlannedTransferAmount;
+  const projectedMonthEndBalance = solved.endBalance;
 
   return {
+    isStash,
+    projectedMab: solved.projectedMab,
     daysInMonth,
     remainingDays,
     dataDay,
@@ -411,7 +415,7 @@ function renderResults(plan) {
   const grid = createElement("div", { className: "results-grid" });
   const primaryResult = createElement("article", { className: "primary-result" });
   primaryResult.append(
-    createElement("strong", { text: `${actionVerb} amount` }),
+    createElement("strong", { text: plan.isStash && plan.todayTransferAmount < 0 ? "Maximum withdrawal with selected buffer" : `${actionVerb} amount` }),
     createElement("span", { className: `primary-amount ${amountClass}`, text: amountText }),
     createElement("p", { className: "result-caption", text: actionText }),
   );
@@ -427,7 +431,7 @@ function renderResults(plan) {
 
   const summary = createElement("article", { className: "summary" });
   const plannedSummary = plan.plannedItems.length > 0
-    ? `Future transfers included: ${plan.plannedItems.map((item) => `${item.type === "deposit" ? "deposit" : "withdraw"} ${formatMoney(item.amount)} on day ${item.day}`).join(", ")}.`
+    ? `Future transfers included: ${plan.plannedItems.map((item) => `${item.signedAmount >= 0 ? "credit" : "withdraw"} ${formatMoney(item.amount)} on day ${item.day}`).join(", ")}.`
     : "No planned transfers were included in this calculation.";
   summary.append(
     createElement("strong", { text: "Notes" }),
@@ -436,6 +440,11 @@ function renderResults(plan) {
     createElement("p", { className: "note", text: `Chosen transaction date: ${formatDisplayDate(plan.actionDate)}.` }),
   );
 
+  summary.append(createElement("p", { text: `Projected month-end MAB: ${formatMoney(plan.projectedMab)}. Target including buffer: ${formatMoney(plan.bufferedTargetMab)}.` }));
+  if (plan.isStash) {
+    summary.append(createElement("p", { text: `Previous month MAB: ${formatMoney(plan.previousMonthMab)}. Projected closing balance: ${formatMoney(plan.projectedMonthEndBalance)}.` }));
+    summary.append(createElement("p", { text: "The limit applies to this month and the transfers entered. A lower closing balance may require a top-up next month to maintain this month’s MAB. Special promotions and earmarked funds are excluded." }));
+  }
   grid.append(primaryResult, actions, summary);
   results.replaceChildren(grid);
 
@@ -447,7 +456,8 @@ function renderResults(plan) {
 
 function renderMathBreakdown(plan) {
   const actionFormula = plan.actionContributionDays > 0
-    ? `(${formatMoney(plan.requiredContributionFromToday)} - ${formatMoney(plan.baseContributionWithoutToday)} - ${formatMoney(plan.plannedContribution)}) / ${plan.actionContributionDays} = ${formatMoney(plan.todayTransferAmount)}`
+    ? `(${formatMoney(plan.requiredContributionFromToday)} - ${formatMoney(plan.baseContributionWithoutToday)} - ${formatMoney(plan.plannedContribution)}) / ${plan.actionContributionDays} `
+      + `; recommended move after conservative cent rounding and available-funds limits: ${formatMoney(plan.todayTransferAmount)}`
     : "No further in-month contribution is possible because the chosen transaction date is too late.";
   clearElement(mathBreakdown);
 
@@ -475,7 +485,7 @@ function renderMathBreakdown(plan) {
 
   appendStep(
     "1. Previous month MAB",
-    `${formatMoney(plan.currentMab)} - ${formatMoney(plan.mabIncrease)} = ${formatMoney(plan.previousMonthMab)}`,
+    plan.isStash ? `Entered previous MAB: ${formatMoney(plan.previousMonthMab)}` : `${formatMoney(plan.currentMab)} - ${formatMoney(plan.mabIncrease)} = ${formatMoney(plan.previousMonthMab)}`,
   );
   appendStep(
     "2. Target MAB",
@@ -483,7 +493,8 @@ function renderMathBreakdown(plan) {
   );
   appendStep(
     "3. Planned MAB with small buffer",
-    `${formatMoney(plan.targetMab)} + ${formatMoney(plan.bufferAmount)} = ${formatMoney(plan.bufferedTargetMab)}`,
+    `${formatMoney(plan.targetMab)} + ${formatMoney(plan.bufferAmount)}; final target = ${formatMoney(plan.bufferedTargetMab)}`,
+    plan.isStash ? "The final target must also exceed S$10,000 to earn bonus interest." : "",
   );
   appendStep(
     "4. Balance needed across the full month",
@@ -501,7 +512,7 @@ function renderMathBreakdown(plan) {
     "7. Contribution from planned transfers",
     `${formatMoney(plan.plannedContribution)}`,
     plan.plannedItems.length === 0 ? "No planned transfers were added." : "",
-    plan.plannedItems.map((item) => `${item.type === "deposit" ? "Deposit" : "Withdrawal"} ${formatMoney(item.amount)} on day ${item.day} affects ${item.activeDays} day(s).`),
+    plan.plannedItems.map((item) => `${item.signedAmount >= 0 ? "Credit" : "Withdrawal"} ${formatMoney(item.amount)} on day ${item.day} affects ${item.activeDays} day(s).`),
   );
   appendStep(
     "8. Additional amount needed from the effective date onward",
@@ -540,7 +551,7 @@ renderEmptyTransfers();
 monthSelect.addEventListener("change", syncDates);
 effectiveDateInput.addEventListener("change", () => {
   const effectiveDate = parseInputDate(effectiveDateInput.value);
-  if (effectiveDate) {
+  if (effectiveDate && effectiveDate.getTime() !== buildMonthDate(Number(monthSelect.value), 0).getTime()) {
     monthSelect.value = String(effectiveDate.getMonth());
   }
   syncDates();
@@ -583,3 +594,53 @@ form.addEventListener("submit", (event) => {
     results.replaceChildren(createElement("div", { className: "placeholder", text: error.message }));
   }
 });
+
+const accountSelect = document.querySelector("#account");
+function syncAccount() {
+  const stash = accountSelect.value === "uob-stash";
+  for (const id of ["previousLabel", "bufferLabel"]) document.querySelector("#" + id).classList.toggle("hidden", !stash);
+  for (const id of ["increaseLabel", "goalLabel"]) document.querySelector("#" + id).classList.toggle("hidden", stash);
+  document.querySelector("h1").textContent = stash ? "UOB Stash withdrawal calculator" : "MAB goal calculator";
+  document.querySelector(".intro").textContent = stash ? "Calculate how much you can withdraw while maintaining last month’s MAB." : "Estimate how much to deposit or withdraw to finish above your OCBC Save MAB increase target (S$500 by default).";
+  if (stash) {
+    for (const id of ["currentBalance", "currentMab"]) {
+      const input = document.querySelector("#" + id);
+      if (!input.value || Number(input.value) === 0) input.value = "50000";
+    }
+    setStashDates();
+  }
+  else syncMabInput();
+  results.replaceChildren(createElement("div", { className: "placeholder", text: "Enter your account values and calculate a plan." }));
+  closeMathModal();
+}
+accountSelect.value = new URLSearchParams(window.location.search).get("account") === "uob-stash" ? "uob-stash" : "ocbc";
+syncAccount();
+accountSelect.addEventListener("change", () => {
+  const url = new URL(window.location.href);
+  url.searchParams.set("account", accountSelect.value);
+  window.history.replaceState(null, "", url);
+  syncAccount();
+});
+monthSelect.addEventListener("change", () => {
+  if (accountSelect.value === "uob-stash") setStashDates();
+  else syncMabInput();
+});
+effectiveDateInput.addEventListener("change", syncMabInput);
+
+function setStashDates() {
+  const month = Number(monthSelect.value);
+  const calculationDate = month === currentMonthIndex ? now : buildMonthDate(month, 1);
+  effectiveDateInput.value = formatDateForInput(addDays(calculationDate, -1));
+  actionDateInput.value = formatDateForInput(calculationDate);
+  syncAllTransferRows();
+  syncMabInput();
+}
+
+function syncMabInput() {
+  const stash = document.querySelector("#account").value === "uob-stash";
+  const atStart = effectiveDateInput.value === formatDateForInput(buildMonthDate(Number(monthSelect.value), 0));
+  const hideCurrent = stash && atStart;
+  document.querySelector("#currentMabLabel").classList.toggle("hidden", hideCurrent);
+  document.querySelector("#currentMab").required = !hideCurrent;
+  if (hideCurrent) document.querySelector("#currentMab").value = "0";
+}

@@ -20,6 +20,7 @@
 
     <section class="card">
       <form id="mab-form" class="calculator-form">
+        <label class="full-width"><span>Account</span><select id="account" name="account"><option value="ocbc">OCBC 360 Save</option><option value="uob-stash">UOB Stash (Singapore)</option></select></label>
         <label>
           <span>Month</span>
           <select id="month" name="month" required></select>
@@ -30,26 +31,28 @@
           <input id="effectiveDate" name="effectiveDate" type="date" required>
         </label>
 
-        <label>
-          <span>Current MAB (as of yesterday)</span>
+        <label id="currentMabLabel">
+          <span>Current MAB (as of the day before)</span>
           <input id="currentMab" name="currentMab" type="number" min="0" step="0.01" value="0" required>
         </label>
 
-        <label>
+        <label id="increaseLabel">
           <span>MAB increase vs previous month</span>
           <input id="mabIncrease" name="mabIncrease" type="number" step="0.01" value="0" required>
         </label>
 
         <label>
-          <span>Current balance</span>
+          <span>Current balance (including credited interest)</span>
           <input id="currentBalance" name="currentBalance" type="number" min="0" step="0.01" value="0" required>
         </label>
 
-        <label>
+        <label id="goalLabel">
           <span>Target increase</span>
           <input id="goalIncrease" name="goalIncrease" type="number" min="0" step="0.01" value="500">
         </label>
 
+        <label id="previousLabel" class="hidden"><span>Previous month’s MAB</span><input id="previousMab" name="previousMab" type="number" min="0" step="0.01" value="50000"></label>
+        <label id="bufferLabel" class="hidden"><span>MAB safety buffer (S$)</span><input id="buffer" name="buffer" type="number" min="0" step="0.01" value="1"></label>
         <label class="full-width">
           <span>Transaction date for this move</span>
           <input id="actionDate" name="actionDate" type="date" required>
@@ -59,7 +62,7 @@
           <div class="planned-header">
             <div>
               <strong>Planned transfers</strong>
-              <p>Add any deposits or withdrawals you already expect from the chosen transaction date through the end of the month.</p>
+              <p>Add any deposits or withdrawals you already expect after the effective date through the end of the month.</p>
             </div>
             <button id="addTransferButton" class="secondary-button" type="button">Add transfer</button>
           </div>
@@ -89,6 +92,7 @@
     </section>
   </div>
 
+  <script src="calculator.js"></script>
   <script src="script.js"></script>
 </body>
 </html>
