@@ -1,5 +1,6 @@
 const monthSelect = document.querySelector("#month");
 const effectiveDateInput = document.querySelector("#effectiveDate");
+const useOlderMabInput = document.querySelector("#useOlderMab");
 const actionDateInput = document.querySelector("#actionDate");
 const form = document.querySelector("#mab-form");
 const results = document.querySelector("#results");
@@ -249,7 +250,7 @@ function syncDates() {
   const defaultDate = selectedMonth === currentMonthIndex ? yesterday : precedingMonthEnd;
   const latestEffectiveDate = selectedMonth === currentMonthIndex ? yesterday : addDays(monthEnd, -1);
   const effectiveInMonth = currentEffectiveDate && currentEffectiveDate >= precedingMonthEnd && currentEffectiveDate <= monthEnd;
-  const syncedDate = effectiveInMonth && currentEffectiveDate <= latestEffectiveDate ? currentEffectiveDate : defaultDate;
+  const syncedDate = useOlderMabInput.checked && effectiveInMonth && currentEffectiveDate <= latestEffectiveDate ? currentEffectiveDate : defaultDate;
   const defaultActionDate = selectedMonth === currentMonthIndex ? now : buildMonthDate(selectedMonth, 1);
   const minimumActionDate = addDays(syncedDate, 1);
   const actionInMonth = currentActionDate && currentActionDate.getFullYear() === currentYear && currentActionDate.getMonth() === selectedMonth;
@@ -557,6 +558,11 @@ syncDates();
 renderEmptyTransfers();
 
 monthSelect.addEventListener("change", syncDates);
+useOlderMabInput.addEventListener("change", () => {
+  document.querySelector("#effectiveDateLabel").classList.toggle("hidden", !useOlderMabInput.checked);
+  syncDates();
+  syncMabInput();
+});
 effectiveDateInput.addEventListener("change", () => {
   const effectiveDate = parseInputDate(effectiveDateInput.value);
   if (effectiveDate && effectiveDate.getTime() !== buildMonthDate(Number(monthSelect.value), 0).getTime()) {
@@ -633,7 +639,7 @@ effectiveDateInput.addEventListener("change", syncMabInput);
 function setStashDates() {
   const month = Number(monthSelect.value);
   const calculationDate = month === currentMonthIndex ? now : buildMonthDate(month, 1);
-  effectiveDateInput.value = formatDateForInput(addDays(calculationDate, -1));
+  if (!useOlderMabInput.checked) effectiveDateInput.value = formatDateForInput(addDays(calculationDate, -1));
   actionDateInput.value = formatDateForInput(calculationDate);
   syncDates();
   syncMabInput();
@@ -645,5 +651,8 @@ function syncMabInput() {
   const hideCurrent = stash && atStart;
   document.querySelector("#currentMabLabel").classList.toggle("hidden", hideCurrent);
   document.querySelector("#currentMab").required = !hideCurrent;
+  document.querySelector("#currentMabLabel span").textContent = useOlderMabInput.checked
+    ? "Current MAB (through chosen date)"
+    : Number(monthSelect.value) === currentMonthIndex ? "Current MAB (as of yesterday)" : "Current MAB (through effective date)";
   if (hideCurrent) document.querySelector("#currentMab").value = "0";
 }

@@ -418,4 +418,18 @@ button:hover {
 
 label.hidden { display: none; }
 
+.date-toggle {
+  flex-direction: row;
+  align-items: center;
+  align-self: center;
+  gap: 0.6rem;
+}
+
+.date-toggle input {
+  width: 1.1rem;
+  min-height: 0;
+  height: 1.1rem;
+  accent-color: var(--accent);
+}
+
 a { color: var(--accent); }

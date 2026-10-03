@@ -26,8 +26,13 @@
           <select id="month" name="month" required></select>
         </label>
 
-        <label>
-          <span>Effective date of current values</span>
+        <label class="date-toggle">
+          <input id="useOlderMab" type="checkbox" aria-controls="effectiveDateLabel">
+          <span>Use older MAB data</span>
+        </label>
+
+        <label id="effectiveDateLabel" class="hidden">
+          <span>MAB as of date</span>
           <input id="effectiveDate" name="effectiveDate" type="date" required>
         </label>
 

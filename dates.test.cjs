@@ -6,8 +6,13 @@ function load(account, timestamp) {
   const elements = new Map();
   function element() {
     return {
-      value: '', children: [], listeners: {},
-      classList: { toggle() {}, add() {}, remove() {}, contains() { return false; } },
+      value: '', checked: false, children: [], listeners: {},
+      classList: {
+        values: new Set(),
+        toggle(name, enabled) { if (enabled) this.values.add(name); else this.values.delete(name); },
+        add(name) { this.values.add(name); }, remove(name) { this.values.delete(name); },
+        contains(name) { return this.values.has(name); },
+      },
       append(...items) {
         this.children.push(...items);
         for (const item of items) if (item.selected) this.value = String(item.value);
@@ -60,6 +65,21 @@ for (const account of ['ocbc', 'uob-stash']) {
     ['mabIncrease', '0'], ['goalIncrease', '500'],
   ]));
   assert.equal(plan.actionDate.getDate(), 3);
+  get('useOlderMab').checked = true;
+  get('useOlderMab').change();
+  assert.equal(get('effectiveDateLabel').classList.contains('hidden'), false);
+  get('effectiveDate').value = '2026-10-01';
+  get('effectiveDate').change();
+  assert.equal(get('effectiveDate').value, '2026-10-01');
+  assert.equal(get('actionDate').value, '2026-10-03');
+  get('actionDate').value = '2026-10-10';
+  get('actionDate').change();
+  assert.equal(get('effectiveDate').value, '2026-10-01');
+  get('useOlderMab').checked = false;
+  get('useOlderMab').change();
+  assert.equal(get('effectiveDateLabel').classList.contains('hidden'), true);
+  assert.equal(get('effectiveDate').value, '2026-10-02');
+  assert.equal(get('actionDate').value, '2026-10-10');
   get('month').value = '10';
   get('month').change();
   assert.equal(get('effectiveDate').value, '2026-10-31');

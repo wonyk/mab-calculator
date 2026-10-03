@@ -20,6 +20,8 @@ Rules verified on 2 October 2026 against [UOB Stash](https://www.uob.com.sg/pers
 
 ## Validation
 
+The MAB date is automatic by default: yesterday for the current month, or the preceding month’s final day when planning another month. Select **Use older MAB data** to reveal and override the date for an older screenshot or historical calculation. Turning it off restores the automatic date while preserving the withdrawal date. A future withdrawal never changes the date of the known MAB.
+
 Run `node calculator.test.cjs` for financial edge cases including cent rounding, month lengths, month-end credits, first-day calculations, and liquidity limits.
 
 ## What It Does
