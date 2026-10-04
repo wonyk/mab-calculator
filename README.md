@@ -2,6 +2,12 @@
 
 The application version is maintained in [VERSION](./VERSION). Completed checkpoints are committed locally, with version increments for application changes.
 
+The page footer shows the version. Styles and scripts use matching version URLs to refresh cached assets when a new version is published.
+
+Results lead with the maximum withdrawal or required deposit and the balance to retain immediately after the move. Custom withdrawal forecasts show whether the bank's balance requirement and the selected buffer are met. The predicted interest card also shows the final-day credit's contribution to MAB.
+
+The date summary always shows the known MAB date and the proposed transaction date. Account figures and target/buffer settings are remembered separately for OCBC and UOB in this browser's local storage. A last-edited time helps identify old figures; review them against the refreshed dates before calculating. Reloading restores today's transaction date and yesterday's MAB date and opens simple mode. Custom withdrawals, pending bonus credits, older-date overrides and planned transfers are not saved. **Clear saved values** clears only the selected account and restores its defaults. The calculator continues working if local storage is unavailable.
+
 This is a small browser-based calculator for estimating how much to deposit or withdraw so your Monthly Average Balance (MAB) ends the month slightly above your target increase.
 
 ## UOB Stash mode
@@ -111,7 +117,7 @@ http://127.0.0.1:4173
 - The transaction date must be later than the effective date.
 - Planned transfers can be scheduled on any date from today through the end of the selected month.
 - If the chosen transaction date is too late in the month, the calculator will tell you that the goal can no longer be reached from that timing.
-- The app is fully client-side and does not store or send your data anywhere.
+- The app is fully client-side. Saved account figures stay in this browser on this device and are not sent to a server.
 
 ## GitHub Pages Hosting
 

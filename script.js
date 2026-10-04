@@ -9,6 +9,132 @@ const plannedTransfers = document.querySelector("#plannedTransfers");
 const mathModal = document.querySelector("#mathModal");
 const closeModalButton = document.querySelector("#closeModalButton");
 const mathBreakdown = document.querySelector("#mathBreakdown");
+const savedFields = ["currentMab", "mabIncrease", "currentBalance", "goalIncrease", "previousMab", "buffer"];
+const figureFields = ["currentMab", "mabIncrease", "currentBalance", "previousMab"];
+const savedKey = account => `mab-calculator.inputs.${account}`;
+let activeAccount = null;
+let savedRecord = null;
+let storageAvailable = true;
+let fieldSequence = 0;
+
+function readSavedInputs(account) {
+  let raw;
+  try {
+    raw = window.localStorage.getItem(savedKey(account));
+    storageAvailable = true;
+  } catch {
+    storageAvailable = false;
+    return null;
+  }
+  try {
+    const record = JSON.parse(raw || "null");
+    return record && record.values && typeof record.values === "object" && !Array.isArray(record.values) ? record : null;
+  } catch {
+    return null;
+  }
+}
+
+function showSavedInputsNote() {
+  const timestamp = savedRecord && typeof savedRecord.figuresEditedAt === "string" && new Date(savedRecord.figuresEditedAt);
+  const hasTimestamp = timestamp && !Number.isNaN(timestamp.getTime());
+  const when = hasTimestamp ? new Intl.DateTimeFormat("en-SG", {
+    timeZone: "Asia/Singapore", day: "numeric", month: "short", year: "numeric", hour: "numeric", minute: "2-digit",
+  }).format(timestamp) : null;
+  document.querySelector("#savedInputsNote").textContent = !storageAvailable
+    ? "Values cannot be saved in this browser."
+    : when ? `Saved on this device · Figures last edited ${when}. Review them for the dates below.`
+      : savedRecord ? "Settings saved on this device. Check your account figures before calculating."
+        : "Account figures are saved on this device as you edit them.";
+  document.querySelector("#clearSavedButton").classList.toggle("hidden", !savedRecord);
+}
+
+function restoreAccountInputs(account) {
+  const defaults = { currentMab: account === "uob-stash" ? "50000" : "0", currentBalance: account === "uob-stash" ? "50000" : "0", mabIncrease: "0", goalIncrease: "500", previousMab: "50000", buffer: "1" };
+  savedRecord = readSavedInputs(account);
+  for (const id of savedFields) {
+    const value = savedRecord && savedRecord.values[id];
+    const valid = typeof value === "string" && value.trim() !== "" && Number.isFinite(Number(value)) && (id === "mabIncrease" || Number(value) >= 0);
+    document.querySelector("#" + id).value = valid ? value : defaults[id];
+  }
+  // One-off scenarios and dated credits are never reused for another account.
+  document.querySelector("#trialWithdrawal").value = "";
+  document.querySelector("#expectedBonus").value = "0";
+  document.querySelector("#bonusDate").value = "";
+  clearElement(plannedTransfers);
+  showSavedInputsNote();
+}
+
+function saveAccountInputs(editedId) {
+  if (!activeAccount) return;
+  const values = { ...(savedRecord ? savedRecord.values : {}) };
+  for (const id of savedFields) {
+    const input = document.querySelector("#" + id);
+    if (input.disabled || (id === "currentMab" && !input.required)) continue;
+    if (input.value.trim() !== "" && Number.isFinite(Number(input.value)) && (id === "mabIncrease" || Number(input.value) >= 0)) values[id] = input.value;
+  }
+  const edited = document.querySelector("#" + editedId);
+  const validEdit = edited && edited.value.trim() !== "" && Number.isFinite(Number(edited.value)) && (editedId === "mabIncrease" || Number(edited.value) >= 0);
+  const record = { values, figuresEditedAt: figureFields.includes(editedId) && validEdit ? new Date().toISOString() : savedRecord && savedRecord.figuresEditedAt };
+  try {
+    window.localStorage.setItem(savedKey(activeAccount), JSON.stringify(record));
+    savedRecord = record;
+    storageAvailable = true;
+  } catch {
+    storageAvailable = false;
+  }
+  showSavedInputsNote();
+}
+
+function updateDateSummary() {
+  const effective = parseInputDate(effectiveDateInput.value);
+  const action = parseInputDate(actionDateInput.value);
+  if (!effective || !action || Number.isNaN(effective.getTime()) || Number.isNaN(action.getTime())) return;
+  const monthStart = effective.getTime() === buildMonthDate(Number(monthSelect.value), 0).getTime();
+  document.querySelector("#dateSummary").textContent = `${monthStart ? "Previous month's MAB through" : "MAB through"} ${formatDisplayDate(effective)} · Withdrawal / deposit on ${formatDisplayDate(action)}`;
+}
+
+function inputError(message, field) {
+  const error = new Error(message);
+  error.field = field;
+  return error;
+}
+
+function clearFieldErrors() {
+  for (const error of form.querySelectorAll(".field-error")) error.remove();
+  for (const input of form.querySelectorAll('[aria-invalid="true"]')) {
+    input.removeAttribute("aria-invalid");
+    input.removeAttribute("aria-describedby");
+  }
+}
+
+function showFieldError(field, message) {
+  const input = document.querySelector("#" + field);
+  const error = createElement("small", { className: "field-error", text: message });
+  error.id = `${field}-error`;
+  input.setAttribute("aria-invalid", "true");
+  input.setAttribute("aria-describedby", error.id);
+  (input.closest("label") || input).append(error);
+}
+
+function validateFormFields() {
+  let firstInvalid = null;
+  for (const input of form.querySelectorAll("input, select")) {
+    if (input.disabled || !input.willValidate || input.validity.valid) continue;
+    const label = input.closest("label");
+    const name = label && label.querySelector("span") ? label.querySelector("span").textContent : "Value";
+    let message = input.validationMessage;
+    if (input.validity.valueMissing) message = `Enter ${name.toLowerCase()}.`;
+    else if (input.validity.badInput) message = "Enter a number, for example 50000.00.";
+    else if (input.validity.rangeUnderflow) message = `Enter ${input.min} or more.`;
+    else if (input.validity.rangeOverflow) message = `Enter ${input.max} or less.`;
+    else if (input.validity.stepMismatch) message = `Use increments of ${input.step}${input.type === "number" && input.step === "0.01" ? " (whole cents)" : ""}.`;
+    if (!input.id) input.id = `transfer-input-${++fieldSequence}`;
+    showFieldError(input.id, message);
+    firstInvalid ||= input;
+  }
+  if (firstInvalid) firstInvalid.focus();
+  return !firstInvalid;
+}
 
 const singaporeParts = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Singapore", year: "numeric", month: "2-digit", day: "2-digit" }).formatToParts(new Date());
 const datePart = type => singaporeParts.find(part => part.type === type).value;
@@ -267,6 +393,7 @@ function syncDates() {
   actionDateInput.value = formatDateForInput(syncedActionDate);
 
   syncAllTransferRows();
+  updateDateSummary();
 }
 
 function getPlannedTransferItems() {
@@ -300,23 +427,23 @@ function calculatePlan(formData) {
   const daysInMonth = getDaysInMonth(monthIndex);
   const plannedItems = getPlannedTransferItems();
   if (!effectiveDate || Number.isNaN(effectiveDate.getTime())) {
-    throw new Error("Enter a valid effective date.");
+    throw inputError("Enter the date through which your bank's MAB figure is available.", "effectiveDate");
   }
   if (!actionDate || Number.isNaN(actionDate.getTime())) {
-    throw new Error("Enter a valid transaction date.");
+    throw inputError("Choose a withdrawal or deposit date in the selected month.", "actionDate");
   }
   const isMonthStart = effectiveDate.getTime() === buildMonthDate(monthIndex, 0).getTime();
   if (!isMonthStart && (effectiveDate.getMonth() !== monthIndex || effectiveDate.getFullYear() !== currentYear)) {
-    throw new Error("The effective date must be within the selected month.");
+    throw inputError("Use MAB data from the selected month, or its preceding month's final day.", "effectiveDate");
   }
   if (actionDate.getMonth() !== monthIndex || actionDate.getFullYear() !== currentYear) {
-    throw new Error("The transaction date must be within the selected month.");
+    throw inputError("Choose a withdrawal or deposit date within the selected month.", "actionDate");
   }
   if (actionDate.getDate() < getMinimumSelectableDay()) {
-    throw new Error(`The transaction date must be between day ${getMinimumSelectableDay()} and day ${daysInMonth} for the selected month.`);
+    throw inputError(`Choose a transaction date between day ${getMinimumSelectableDay()} and day ${daysInMonth}.`, "actionDate");
   }
   if (actionDate <= effectiveDate) {
-    throw new Error("The transaction date must be later than the effective date of your current values.");
+    throw inputError(`Choose ${formatDisplayDate(addDays(effectiveDate, 1))} or later; your MAB already includes the chosen transaction day.`, "actionDate");
   }
 
   const dataDay = isMonthStart ? 0 : effectiveDate.getDate();
@@ -325,7 +452,11 @@ function calculatePlan(formData) {
   }
   const previousMonthMab = isStash ? Number(formData.get("previousMab")) : currentMab - mabIncrease;
   const bufferInput = isStash ? Number(formData.get("buffer")) : 10;
-  if (![currentMab, currentBalance, previousMonthMab, goalIncrease, bufferInput].every(value => Number.isFinite(value) && value >= 0)) throw new Error("Balances, target and buffer must be valid non-negative amounts.");
+  for (const [field, value] of [["currentMab", currentMab], ["currentBalance", currentBalance], [isStash ? "previousMab" : "mabIncrease", previousMonthMab], ["goalIncrease", goalIncrease], ["buffer", bufferInput]]) {
+    if (!Number.isFinite(value) || value < 0) throw inputError(field === "mabIncrease"
+      ? "The increase is greater than your current MAB. Check both figures; the implied previous month's MAB cannot be negative."
+      : "Enter a valid amount of zero or more.", field);
+  }
   const targetMab = previousMonthMab + goalIncrease;
   const bufferAmount = bufferInput;
   const bufferedTargetMab = Math.max(targetMab + bufferAmount, isStash ? 10000.01 : 0);
@@ -336,20 +467,20 @@ function calculatePlan(formData) {
   const actionContributionDays = Math.max(0, daysInMonth - actionDate.getDate() + 1);
 
   const expectedBonus = advanced && !isStash ? Number(formData.get("expectedBonus") || 0) : 0;
-  if (!Number.isFinite(expectedBonus) || expectedBonus < 0) throw new Error("Enter a valid expected bonus amount.");
+  if (!Number.isFinite(expectedBonus) || expectedBonus < 0) throw inputError("Enter an expected bonus amount of zero or more.", "expectedBonus");
   if (expectedBonus > 0) {
     const bonusDate = parseInputDate(formData.get("bonusDate"));
     if (!bonusDate || Number.isNaN(bonusDate.getTime()) || bonusDate.getFullYear() !== currentYear || bonusDate.getMonth() !== monthIndex || bonusDate <= effectiveDate) {
-      throw new Error("Expected bonus posting date must be after the MAB effective date and within the selected month. Include already credited interest in your current balance instead.");
+      throw inputError("Expected bonus posting date must be after the MAB effective date and within the selected month. Include already credited interest in your current balance instead.", "bonusDate");
     }
     plannedItems.push({ day: bonusDate.getDate(), amount: expectedBonus, signedAmount: expectedBonus, type: "bonus" });
   }
   plannedItems.forEach((item) => {
     if (!Number.isInteger(item.day) || item.day <= dataDay || item.day > daysInMonth) {
-      throw new Error(`Planned transfer days must be between ${dataDay + 1} and ${daysInMonth}.`);
+      throw inputError(`Planned transfer days must be between ${dataDay + 1} and ${daysInMonth}.`, "plannedTransfers");
     }
     if (!Number.isFinite(item.amount) || item.amount < 0) {
-      throw new Error("Planned transfer amounts cannot be negative.");
+      throw inputError("Enter a planned transfer amount of zero or more; choose Withdrawal for money leaving the account.", "plannedTransfers");
     }
   });
 
@@ -373,7 +504,7 @@ function calculatePlan(formData) {
     const rate = Number(rateValue) / 100;
     const yearDays = Number(formData.get("yearDays"));
     if (rateValue === null || rateValue === "" || !Number.isFinite(rate) || rate < 0 || rate > 1 || ![365, 366].includes(yearDays)) {
-      throw new Error("Enter a valid base interest rate and select a 365 or 366 day basis.");
+      throw inputError("Enter a base interest rate between 0 and 100% and select a 365 or 366 day basis.", ![365, 366].includes(yearDays) ? "yearDays" : "baseRate");
     }
     baseInterest = { rate, yearDays };
   }
@@ -382,17 +513,23 @@ function calculatePlan(formData) {
   try {
     basicPlan = solveMabPlan({ ...solveOptions, transfers: plannedItems.filter(item => item.type !== "bonus") });
   } catch (error) {
-    if (!advanced) throw error;
+    if (!advanced) { error.field = "plannedTransfers"; throw error; }
     // An entered bonus may fund a planned transfer before the main move.
     // A comparison without that credit must not block the advanced plan.
     basicPlan = null;
   }
-  const solved = advanced ? solveMabPlan({ ...solveOptions, baseInterest }) : basicPlan;
+  let solved;
+  try {
+    solved = advanced ? solveMabPlan({ ...solveOptions, baseInterest }) : basicPlan;
+  } catch (error) {
+    error.field = "plannedTransfers";
+    throw error;
+  }
   let trial = null;
   const trialValue = formData.get("trialWithdrawal");
   if (advanced && trialValue !== null && trialValue !== "") {
     const amount = Number(trialValue);
-    if (!Number.isFinite(amount) || amount < 0) throw new Error("Enter a valid trial withdrawal amount.");
+    if (!Number.isFinite(amount) || amount < 0) throw inputError("Enter a custom withdrawal amount of zero or more.", "trialWithdrawal");
     try {
       trial = { amount, ...projectMabMove({ ...solveOptions, baseInterest }, -amount) };
       trial.meetsTarget = trial.projectedMab >= bufferedTargetMab - 1e-8;
@@ -448,23 +585,19 @@ function calculatePlan(formData) {
 }
 
 function renderResults(plan) {
-  let actionVerb = "Deposit";
   let amountClass = "amount-deposit";
   let actionText = `Deposit ${formatMoney(plan.todayTransferAmount)} on ${formatDisplayDate(plan.actionDate)} to stay slightly above the goal.`;
   let amountText = formatMoney(plan.todayTransferAmount);
 
   if (plan.cannotReachGoal) {
-    actionVerb = "Final";
     amountClass = "amount-neutral";
     amountText = formatMoney(0);
     actionText = `A transfer on ${formatDisplayDate(plan.actionDate)} is too late to affect this month's goal. Choose an earlier transaction date.`;
   } else if (plan.todayTransferAmount < 0) {
-    actionVerb = "Withdraw";
     amountClass = "amount-withdraw";
     amountText = formatMoney(Math.abs(plan.todayTransferAmount));
     actionText = `Withdraw ${formatMoney(Math.abs(plan.todayTransferAmount))} on ${formatDisplayDate(plan.actionDate)}.`;
   } else if (plan.todayTransferAmount === 0) {
-    actionVerb = "Move";
     amountClass = "amount-neutral";
     amountText = formatMoney(0);
     actionText = `No additional transfer is needed on ${formatDisplayDate(plan.actionDate)} if your planned transfers still happen.`;
@@ -474,10 +607,12 @@ function renderResults(plan) {
 
   const grid = createElement("div", { className: "results-grid" });
   const primaryResult = createElement("article", { className: "primary-result" });
+  const actionWhen = formatDateForInput(plan.actionDate) === formatDateForInput(now) ? "today" : `on ${formatDisplayDate(plan.actionDate)}`;
   primaryResult.append(
-    createElement("strong", { text: plan.todayTransferAmount < 0 ? "Recommended maximum withdrawal with buffer" : `Recommended ${actionVerb.toLowerCase()} amount` }),
+    createElement("strong", { text: plan.todayTransferAmount < 0 ? `You can withdraw up to this amount ${actionWhen}` : plan.todayTransferAmount === 0 ? "No deposit or withdrawal needed" : `Deposit this amount ${actionWhen}` }),
     createElement("span", { className: `primary-amount ${amountClass}`, text: amountText }),
     createElement("p", { className: "result-caption", text: actionText }),
+    createElement("p", { className: "balance-guidance", text: `Keep at least ${formatMoney(plan.targetBalanceToday)} immediately after this move to retain your MAB buffer.${plan.plannedItems.length ? " Includes the scheduled transfers below." : " Assumes no further transfers."}` }),
   );
 
   const actions = createElement("div", { className: "result-actions" });
@@ -513,6 +648,12 @@ function renderResults(plan) {
       createElement("strong", { text: plan.trial && !plan.trial.error ? `Forecast after your ${formatMoney(plan.trial.amount)} withdrawal` : "Forecast after the recommended move" }),
       createElement("p", { text: `On ${formatDisplayDate(plan.actionDate)}, using MAB known through ${formatDisplayDate(plan.effectiveDate)}.` }),
     );
+    if (plan.trial && !plan.trial.error) {
+      scenarioHeading.append(createElement("p", {
+        className: `forecast-status ${plan.trial.meetsTarget ? "status-good" : plan.trial.meetsRequirement ? "status-buffer" : "status-low"}`,
+        text: plan.trial.meetsTarget ? "Meets requirement and buffer" : plan.trial.meetsRequirement ? "Meets requirement but below buffer" : "Below requirement",
+      }));
+    }
     grid.append(scenarioHeading);
     const forecastGrid = createElement("div", { className: "forecast-grid" });
     for (const [label, value] of [
@@ -525,23 +666,19 @@ function renderResults(plan) {
     ]) {
       const metric = createElement("article", { className: "metric" });
       metric.append(createElement("strong", { text: label }), createElement("span", { text: formatMoney(value) }));
+      if (label === "Predicted full-month base interest") metric.append(createElement("small", { className: "interest-impact", text: `Adds ${formatMoney(selectedForecast.estimatedBaseInterest / plan.daysInMonth)} to this month's MAB (final-day credit).` }));
       forecastGrid.append(metric);
     }
     grid.append(forecastGrid);
     summary.append(createElement("p", { text: `Base interest is estimated at ${(plan.baseInterest.rate * 100).toFixed(3)}% p.a. using ${plan.baseInterest.yearDays} days. The credit affects only the final day's MAB; it cannot fund an earlier withdrawal. The recommended move retains your S$${plan.bufferAmount.toFixed(2)} MAB buffer.` }));
     summary.append(createElement("p", { text: plan.basicMove === null ? "Simple mode cannot fund the entered planned transfers before the transaction date without the pending bonus." : `Simple mode would recommend a signed move of ${formatMoney(plan.basicMove)} without forecast interest credits.` }));
     if (plan.expectedBonus > 0) summary.append(createElement("p", { text: `Includes an entered future OCBC bonus credit of ${formatMoney(plan.expectedBonus)}. This is last month's expected bonus, not a prediction of earnings from your withdrawal. Its posting date and amount are assumptions.` }));
-    if (plan.trial) {
+    if (plan.trial && plan.trial.error) {
       const trial = createElement("article", { className: "summary" });
       trial.append(createElement("strong", { text: `If you withdraw ${formatMoney(plan.trial.amount)}` }));
-      if (plan.trial.error) {
-        trial.append(createElement("p", { text: plan.trial.error }));
-      } else {
-        trial.append(
-          createElement("p", { text: plan.trial.meetsTarget ? "Meets the balance target and selected buffer." : plan.trial.meetsRequirement ? "Meets the bank's balance requirement but falls below your selected buffer." : plan.isStash ? "Falls below the Stash bonus-interest balance requirement." : "Falls below the OCBC Save balance-increase requirement." }),
-        );
-      }
+      trial.append(createElement("p", { text: plan.trial.error }));
       grid.append(trial);
+      showFieldError("trialWithdrawal", plan.trial.error);
     }
   }
   if (!plan.advanced) {
@@ -693,11 +830,16 @@ effectiveDateInput.addEventListener("change", () => {
 });
 actionDateInput.addEventListener("change", () => {
   syncAllTransferRows();
+  updateDateSummary();
 });
-addTransferButton.addEventListener("click", createTransferRow);
+addTransferButton.addEventListener("click", () => {
+  createTransferRow();
+  invalidatePlan();
+});
 plannedTransfers.addEventListener("click", (event) => {
   if (event.target.classList.contains("remove-transfer")) {
     event.target.closest(".planned-transfer-row").remove();
+    invalidatePlan();
     renderEmptyTransfers();
   }
 });
@@ -715,6 +857,12 @@ document.addEventListener("keydown", (event) => {
 
 form.addEventListener("submit", (event) => {
   event.preventDefault();
+  clearFieldErrors();
+  if (!validateFormFields()) {
+    results.replaceChildren(createElement("div", { className: "placeholder", text: "Check the highlighted fields, then calculate again." }));
+    closeMathModal();
+    return;
+  }
   try {
     const formData = new FormData(form);
     const plan = calculatePlan(formData);
@@ -722,31 +870,62 @@ form.addEventListener("submit", (event) => {
     closeMathModal();
   } catch (error) {
     closeMathModal();
+    if (error.field) {
+      showFieldError(error.field, error.message);
+      const input = document.querySelector("#" + error.field);
+      if (input.focus) input.focus();
+    }
     results.replaceChildren(createElement("div", { className: "placeholder", text: error.message }));
   }
 });
 
+function invalidatePlan() {
+  clearFieldErrors();
+  closeMathModal();
+  results.replaceChildren(createElement("div", { className: "placeholder", text: "Values changed. Calculate again to update your plan." }));
+}
+
+function handleInputEdit(event) {
+  invalidatePlan();
+  if (savedFields.includes(event.target.id)) saveAccountInputs(event.target.id);
+  if (["effectiveDate", "actionDate"].includes(event.target.id)) updateDateSummary();
+}
+form.addEventListener("input", handleInputEdit);
+form.addEventListener("change", handleInputEdit);
+
 const accountSelect = document.querySelector("#account");
 function syncAccount() {
   const stash = accountSelect.value === "uob-stash";
+  if (activeAccount !== accountSelect.value) {
+    activeAccount = accountSelect.value;
+    restoreAccountInputs(activeAccount);
+    useOlderMabInput.checked = false;
+    document.querySelector("#effectiveDateLabel").classList.add("hidden");
+    effectiveDateInput.value = "";
+    actionDateInput.value = "";
+    syncDates();
+  }
+  clearFieldErrors();
   // Each account opens in simple mode; forecasting always requires opting in.
   document.querySelector("#advancedMode").checked = false;
   document.querySelector("#advancedTitle").textContent = stash
     ? "Advanced: interest and withdrawal forecast"
     : "Advanced (OCBC trial): interest and withdrawal forecast";
-  syncAdvanced();
   for (const id of ["previousLabel", "bufferLabel"]) document.querySelector("#" + id).classList.toggle("hidden", !stash);
   for (const id of ["increaseLabel", "goalLabel"]) document.querySelector("#" + id).classList.toggle("hidden", stash);
+  for (const id of ["mabIncrease", "goalIncrease"]) document.querySelector("#" + id).disabled = stash;
+  for (const id of ["previousMab", "buffer"]) {
+    document.querySelector("#" + id).disabled = !stash;
+    document.querySelector("#" + id).required = stash;
+  }
   document.querySelector("h1").textContent = stash ? "UOB Stash withdrawal calculator" : "MAB goal calculator";
   document.querySelector(".intro").textContent = stash ? "Calculate how much you can withdraw while maintaining last month’s MAB." : "Estimate how much to deposit or withdraw to finish above your OCBC Save MAB increase target (S$500 by default).";
   if (stash) {
-    for (const id of ["currentBalance", "currentMab"]) {
-      const input = document.querySelector("#" + id);
-      if (!input.value || Number(input.value) === 0) input.value = "50000";
-    }
     setStashDates();
   }
   else syncMabInput();
+  syncAdvanced();
+  updateDateSummary();
   results.replaceChildren(createElement("div", { className: "placeholder", text: "Enter your account values and calculate a plan." }));
   closeMathModal();
 }
@@ -756,6 +935,18 @@ accountSelect.addEventListener("change", () => {
   const url = new URL(window.location.href);
   url.searchParams.set("account", accountSelect.value);
   window.history.replaceState(null, "", url);
+  syncAccount();
+});
+document.querySelector("#clearSavedButton").addEventListener("click", () => {
+  try {
+    window.localStorage.removeItem(savedKey(activeAccount));
+    storageAvailable = true;
+  } catch {
+    storageAvailable = false;
+    showSavedInputsNote();
+    return;
+  }
+  activeAccount = null;
   syncAccount();
 });
 monthSelect.addEventListener("change", () => {

@@ -69,6 +69,9 @@ assert.ok(Math.abs(p.mabBeforeInterest - 1710000 / 31) < 1e-8);
 assert.equal(p.estimatedBaseInterest, 2.34);
 // Forecast credits cannot fund a last-day withdrawal or earlier planned outflows.
 assert.throws(() => project({ ...advanced, actionDay: 31 }, -50101));
+assert.throws(() => project(advanced, -50200), /by S\$100.00 on day 1/);
+assert.throws(() => solve({ ...advanced, actionDay: 10, transfers: [{ day: 5, signedAmount: -50200 }] }), /by S\$100.00 on day 5.*earlier deposit/);
+assert.throws(() => project({ ...advanced, transfers: [{ day: 5, signedAmount: -100 }] }, -50100), /short by S\$100.00 on day 5/);
 p = solve({ ...base, currentMab: 300000, transfers: [{ day: 20, signedAmount: -90000 }], baseInterest: advanced.baseInterest });
 assert.equal(p.move, -10150);
 assert.equal(p.endBalanceBeforeInterest, 0);

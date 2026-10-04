@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MAB Goal Calculator</title>
-  <link rel="stylesheet" href="styles.css">
+  <link rel="stylesheet" href="styles.css?v=1.5.0">
 </head>
 <body>
   <main class="app-shell">
@@ -19,8 +19,9 @@
     </section>
 
     <section class="card">
-      <form id="mab-form" class="calculator-form">
+      <form id="mab-form" class="calculator-form" novalidate>
         <label class="full-width"><span>Account</span><select id="account" name="account"><option value="ocbc">OCBC 360 Save</option><option value="uob-stash">UOB Stash (Singapore)</option></select></label>
+        <div class="saved-inputs full-width"><p id="savedInputsNote"></p><button id="clearSavedButton" class="text-button hidden" type="button">Clear saved values</button></div>
         <label>
           <span>Month</span>
           <select id="month" name="month" required></select>
@@ -62,6 +63,7 @@
           <span>Transaction date for this move</span>
           <input id="actionDate" name="actionDate" type="date" required>
         </label>
+        <p id="dateSummary" class="date-summary full-width" aria-live="polite"></p>
 
         <label id="advancedToggleLabel" class="date-toggle full-width">
           <input id="advancedMode" name="advancedMode" type="checkbox" aria-controls="advancedPanel">
@@ -104,6 +106,7 @@
         MAB increase versus last month, and current balance.
       </div>
     </section>
+    <footer class="app-footer">Version <span id="appVersion">1.5.0</span></footer>
   </main>
 
   <div id="mathModal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="mathModalTitle">
@@ -117,7 +120,7 @@
     </section>
   </div>
 
-  <script src="calculator.js"></script>
-  <script src="script.js"></script>
+  <script src="calculator.js?v=1.5.0"></script>
+  <script src="script.js?v=1.5.0"></script>
 </body>
 </html>
