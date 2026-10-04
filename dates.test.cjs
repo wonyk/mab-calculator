@@ -94,4 +94,47 @@ for (const timestamp of ['2026-10-01T04:00:00Z', '2027-01-01T04:00:00Z']) {
   assert.equal(get('actionDate').min, timestamp.slice(0, 10));
   assert.ok(get('effectiveDate').value < get('actionDate').value);
 }
+{
+  const { context, get } = load('uob-stash', '2026-10-01T04:00:00Z');
+  assert.equal(get('advancedPanel').classList.contains('hidden'), true);
+  assert.equal(get('baseRate').disabled, true);
+  get('advancedStash').checked = true;
+  get('advancedStash').change();
+  assert.equal(get('advancedPanel').classList.contains('hidden'), false);
+  assert.equal(get('baseRate').disabled, false);
+  const data = new Map([
+    ['account', 'uob-stash'], ['month', '9'], ['effectiveDate', '2026-09-30'],
+    ['actionDate', '2026-10-01'], ['currentMab', '0'], ['currentBalance', '50100'],
+    ['previousMab', '50000'], ['buffer', '1'], ['advancedStash', 'on'],
+    ['baseRate', '0.05'], ['yearDays', '365'], ['trialWithdrawal', '100'],
+  ]);
+  let plan = context.calculatePlan(data);
+  assert.equal(plan.todayTransferAmount, -99.06);
+  assert.equal(plan.forecast.estimatedBaseInterest, 2.12);
+  assert.equal(plan.trial.meetsRequirement, true);
+  assert.equal(plan.trial.meetsTarget, false);
+  context.renderResults(plan);
+  context.renderMathBreakdown(plan);
+  data.set('trialWithdrawal', '50101');
+  plan = context.calculatePlan(data);
+  assert.ok(plan.trial.error);
+  assert.equal(plan.todayTransferAmount, -99.06);
+  context.renderResults(plan);
+  data.set('advancedStash', '');
+  assert.equal(context.calculatePlan(data).todayTransferAmount, -99);
+  data.set('advancedStash', 'on');
+  data.set('baseRate', '');
+  assert.throws(() => context.calculatePlan(data));
+  data.set('account', 'ocbc');
+  data.set('mabIncrease', '0');
+  data.set('goalIncrease', '500');
+  data.set('currentMab', '50000');
+  assert.equal(context.calculatePlan(data).advanced, false);
+  get('account').value = 'ocbc';
+  context.syncAccount();
+  assert.equal(get('advancedToggleLabel').classList.contains('hidden'), true);
+  assert.equal(get('advancedPanel').classList.contains('hidden'), true);
+  assert.equal(get('baseRate').disabled, true);
+}
 console.log('Date selection regressions passed for both accounts and month/year boundaries.');
+console.log('Advanced UI toggle, forecast rendering, trial status and OCBC isolation checks passed.');

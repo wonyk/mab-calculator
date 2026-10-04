@@ -14,9 +14,28 @@ Stash defaults to calculating today using MAB known through yesterday. For a dif
 
 There is no separate interest field. Base interest (0.05% p.a.) is credited on the last day of the month; the remaining bonus interest is credited at the beginning of the following month. Last month’s interest already credited is included in the current balance, and any credit reflected in the completed month is already included in that month’s MAB. Uncredited interest is not assumed; if needed, add it as a planned deposit on its actual posting day.
 
-The recommendation rounds withdrawals down and deposits up to cents and reserves money for planned withdrawals. It is conditional on the dated transfers entered, assumes no other balance changes, and concerns the selected month only. A reduced closing balance can require a top-up next month. Promotional or earmarked-fund conditions are outside scope. It does not estimate future interest automatically or promise a particular interest payout.
+The recommendation rounds withdrawals down and deposits up to cents and reserves money for planned withdrawals. It is conditional on the dated transfers entered, assumes no other balance changes, and concerns the selected month only. A reduced closing balance can require a top-up next month. Promotional or earmarked-fund conditions are outside scope. Basic mode excludes uncredited interest; advanced mode provides a forecast rather than a guaranteed bank payout.
 
 Rules verified on 2 October 2026 against [UOB Stash](https://www.uob.com.sg/personal/save/savings-accounts/stash-account.page) and [UOB account terms](https://www.uob.com.sg/web-resources/personal/pdf/personal/save/tnc-cts.pdf), section 41.
+
+## Advanced Stash projection
+
+Select **Advanced: include month-end base interest** in UOB Stash mode. The default base rate is 0.05% p.a.; the day-count basis defaults to 365 and can be changed to 366. The rate and month-end accrual timing were rechecked against UOB's product page and account terms on 4 October 2026. The public sources do not specify the denominator or rounding method, so these are explicit estimation assumptions.
+
+The forecast includes the entire selected month's daily balance-days: historical MAB multiplied by completed days, then future balances after the recommended move and each planned transfer. It calculates base interest on those balances before the forecast credit, rounds the credit down to cents, and adds it only to the final day's closing balance. The day-1 bonus is already part of the current balance entered by the user and is not forecast separately. Do not also enter the forecast base credit as a planned deposit.
+
+For balance-days `S`, annual base rate `r`, year-day basis `Y` and calendar days `D`, the model uses:
+
+```text
+Base interest = floor(S × r / Y × 100) / 100
+Month-end MAB = (S + base interest) / D
+```
+
+Since the withdrawal changes `S` and therefore interest, the solver finds the minimum deposit or maximum withdrawal at cent precision that preserves the target MAB and buffer after the rounded credit. It also checks that forecast interest cannot finance the withdrawal or earlier planned outflows. Basic mode and OCBC do not use this model.
+
+Results show base interest, MAB before and after the credit, and the extra withdrawal compared with basic mode. An optional trial withdrawal forecasts a user-chosen amount and distinguishes meeting the bank's balance requirement from keeping the selected buffer. The estimate assumes base interest posts on the last day and counts toward that day's MAB; posting and rounding differences can change the actual result.
+
+Example: a 31-day month starting with S$50,100 and last month's MAB of S$50,000, a S$1 buffer and no planned transfers. Basic mode recommends withdrawing S$99.00 on day 1. Advanced mode predicts S$2.12 base interest and permits S$99.06, leaving S$50,000.94 before the credit and a projected MAB of approximately S$50,001.0084 after it.
 
 ## Validation
 

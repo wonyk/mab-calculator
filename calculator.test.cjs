@@ -40,3 +40,50 @@ for (const days of [28, 29, 30, 31]) {
   assert.ok(p.projectedMab < base.target + .01);
 }
 console.log('12 financial calculation scenarios passed');
+
+const advanced = { days: 31, dataDay: 0, actionDay: 1, currentMab: 0, currentBalance: 50100, target: 50001, transfers: [], baseInterest: { rate: 0.0005, yearDays: 365 } };
+p = solve(advanced);
+assert.equal(p.move, -99.06);
+assert.equal(p.estimatedBaseInterest, 2.12);
+assert.ok(Math.abs(p.mabBeforeInterest - 50000.94) < 1e-8);
+assert.ok(p.projectedMab >= advanced.target);
+assert.ok(p.projectedMab < advanced.target + 0.01);
+assert.ok(Math.abs(p.endBalance - 50003.06) < 1e-8);
+// One cent more withdrawal fails: recommendation is maximal at cent precision.
+const project = context.projectMabMove;
+assert.ok(project(advanced, p.move - 0.01).projectedMab < advanced.target);
+assert.ok(Math.abs((p.projectedMab - p.mabBeforeInterest) - 2.12 / 31) < 1e-8);
+// Forecast for a user-chosen withdrawal includes the entire month's interest.
+p = project(advanced, -100);
+assert.equal(p.mabBeforeInterest, 50000);
+assert.equal(p.estimatedBaseInterest, 2.12);
+assert.ok(p.projectedMab < advanced.target);
+// Accrued interest from completed days is included even with a last-day withdrawal.
+p = solve({ ...advanced, dataDay: 30, actionDay: 31, currentMab: 50000 });
+assert.equal(p.estimatedBaseInterest, 2.12);
+assert.equal(p.move, -71.12);
+assert.ok(p.projectedMab >= advanced.target - 1e-8);
+// Planned cash flows earn interest only after their posting days.
+p = project({ ...advanced, currentBalance: 50000, transfers: [{ day: 16, signedAmount: 10000 }] }, 0);
+assert.ok(Math.abs(p.mabBeforeInterest - 1710000 / 31) < 1e-8);
+assert.equal(p.estimatedBaseInterest, 2.34);
+// Forecast credits cannot fund a last-day withdrawal or earlier planned outflows.
+assert.throws(() => project({ ...advanced, actionDay: 31 }, -50101));
+p = solve({ ...base, currentMab: 300000, transfers: [{ day: 20, signedAmount: -90000 }], baseInterest: advanced.baseInterest });
+assert.equal(p.move, -10150);
+assert.equal(p.endBalanceBeforeInterest, 0);
+// Disabled or zero-rate interest reproduces the basic recommendation.
+assert.equal(solve({ ...base, baseInterest: { rate: 0, yearDays: 365 } }).move, solve(base).move);
+for (const days of [28, 29, 30, 31]) {
+  for (const yearDays of [365, 366]) {
+    const options = { ...advanced, days, baseInterest: { rate: 0.0005, yearDays } };
+    p = solve(options);
+    assert.ok(p.projectedMab >= options.target - 1e-8);
+    assert.ok(project(options, p.move - 0.01).projectedMab < options.target);
+    assert.ok(p.estimatedBaseInterest > 0);
+  }
+}
+// Base interest still applies above the Stash bonus-interest cap.
+p = project({ ...advanced, currentBalance: 200000 }, 0);
+assert.equal(p.estimatedBaseInterest, 8.49);
+console.log('Advanced interest, trial withdrawal, liquidity, month-length and day-count checks passed');

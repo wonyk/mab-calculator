@@ -357,7 +357,33 @@ function calculatePlan(formData) {
   const baseContributionWithoutToday = currentBalance * remainingDays;
   const requiredContributionFromToday = totalBalanceNeeded - totalAccumulatedSoFar;
 
-  const solved = solveMabPlan({ days: daysInMonth, dataDay, actionDay: actionDate.getDate(), currentMab, currentBalance, target: bufferedTargetMab, transfers: plannedItems });
+  const advanced = isStash && formData.get("advancedStash") === "on";
+  let baseInterest = null;
+  if (advanced) {
+    const rateValue = formData.get("baseRate");
+    const rate = Number(rateValue) / 100;
+    const yearDays = Number(formData.get("yearDays"));
+    if (rateValue === null || rateValue === "" || !Number.isFinite(rate) || rate < 0 || rate > 1 || ![365, 366].includes(yearDays)) {
+      throw new Error("Enter a valid base interest rate and select a 365 or 366 day basis.");
+    }
+    baseInterest = { rate, yearDays };
+  }
+  const solveOptions = { days: daysInMonth, dataDay, actionDay: actionDate.getDate(), currentMab, currentBalance, target: bufferedTargetMab, transfers: plannedItems };
+  const basicPlan = solveMabPlan(solveOptions);
+  const solved = advanced ? solveMabPlan({ ...solveOptions, baseInterest }) : basicPlan;
+  let trial = null;
+  const trialValue = formData.get("trialWithdrawal");
+  if (advanced && trialValue !== null && trialValue !== "") {
+    const amount = Number(trialValue);
+    if (!Number.isFinite(amount) || amount < 0) throw new Error("Enter a valid trial withdrawal amount.");
+    try {
+      trial = { amount, ...projectMabMove({ ...solveOptions, baseInterest }, -amount) };
+      trial.meetsTarget = trial.projectedMab >= bufferedTargetMab - 1e-8;
+      trial.meetsRequirement = trial.projectedMab >= previousMonthMab - 1e-8 && trial.projectedMab > 10000;
+    } catch (error) {
+      trial = { amount, error: error.message };
+    }
+  }
   const todayTransferAmount = solved.move;
   const cannotReachGoal = false;
   const targetBalanceToday = solved.actionBalance;
@@ -366,6 +392,11 @@ function calculatePlan(formData) {
 
   return {
     isStash,
+    advanced,
+    baseInterest,
+    forecast: solved,
+    basicMove: basicPlan.move,
+    trial,
     projectedMab: solved.projectedMab,
     daysInMonth,
     remainingDays,
@@ -454,7 +485,36 @@ function renderResults(plan) {
     summary.append(createElement("p", { text: `Previous month MAB: ${formatMoney(plan.previousMonthMab)}. Projected closing balance: ${formatMoney(plan.projectedMonthEndBalance)}.` }));
     summary.append(createElement("p", { text: "The limit applies to this month and the transfers entered. A lower closing balance may require a top-up next month to maintain this month’s MAB. Special promotions and earmarked funds are excluded." }));
   }
-  grid.append(primaryResult, actions, summary);
+  grid.append(primaryResult);
+  if (plan.advanced) {
+    const forecastGrid = createElement("div", { className: "forecast-grid" });
+    for (const [label, value] of [
+      ["Predicted month-end base interest", plan.forecast.estimatedBaseInterest],
+      ["MAB before base-interest credit", plan.forecast.mabBeforeInterest],
+      ["MAB including base-interest credit", plan.projectedMab],
+      ["Extra withdrawal allowed by base interest", Math.max(0, plan.basicMove - plan.todayTransferAmount)],
+    ]) {
+      const metric = createElement("article", { className: "metric" });
+      metric.append(createElement("strong", { text: label }), createElement("span", { text: formatMoney(value) }));
+      forecastGrid.append(metric);
+    }
+    grid.append(forecastGrid);
+    summary.append(createElement("p", { text: `This recommendation includes estimated base interest at ${(plan.baseInterest.rate * 100).toFixed(3)}% p.a. using ${plan.baseInterest.yearDays} days. The credit affects only the final day's MAB; it cannot fund an earlier withdrawal. Your S$${plan.bufferAmount.toFixed(2)} MAB buffer is retained.` }));
+    if (plan.trial) {
+      const trial = createElement("article", { className: "summary" });
+      trial.append(createElement("strong", { text: `If you withdraw ${formatMoney(plan.trial.amount)}` }));
+      if (plan.trial.error) {
+        trial.append(createElement("p", { text: plan.trial.error }));
+      } else {
+        trial.append(
+          createElement("p", { text: `Predicted base interest: ${formatMoney(plan.trial.estimatedBaseInterest)}. Projected MAB including that credit: ${formatMoney(plan.trial.projectedMab)}. Closing balance: ${formatMoney(plan.trial.endBalance)}.` }),
+          createElement("p", { text: plan.trial.meetsTarget ? "Meets last month's MAB and your selected buffer." : plan.trial.meetsRequirement ? "Meets last month's MAB but falls below your selected buffer." : "Falls below the Stash bonus-interest balance requirement." }),
+        );
+      }
+      grid.append(trial);
+    }
+  }
+  grid.append(actions, summary);
   results.replaceChildren(grid);
 
   showDetailsButton.addEventListener("click", () => {
@@ -464,7 +524,9 @@ function renderResults(plan) {
 }
 
 function renderMathBreakdown(plan) {
-  const actionFormula = plan.actionContributionDays > 0
+  const actionFormula = plan.advanced
+    ? `Find the smallest cent-rounded move for which (balance-days + floor-to-cents(balance-days × ${plan.baseInterest.rate} / ${plan.baseInterest.yearDays})) / ${plan.daysInMonth} ≥ ${formatMoney(plan.bufferedTargetMab)}. Recommended move: ${formatMoney(plan.todayTransferAmount)}.`
+    : plan.actionContributionDays > 0
     ? `(${formatMoney(plan.requiredContributionFromToday)} - ${formatMoney(plan.baseContributionWithoutToday)} - ${formatMoney(plan.plannedContribution)}) / ${plan.actionContributionDays} `
       + `; recommended move after conservative cent rounding and available-funds limits: ${formatMoney(plan.todayTransferAmount)}`
     : "No further in-month contribution is possible because the chosen transaction date is too late.";
@@ -538,9 +600,21 @@ function renderMathBreakdown(plan) {
   );
   appendStep(
     "10. Target balance after the chosen action",
-    `${formatMoney(plan.currentBalance)} + ${formatMoney(plan.todayTransferAmount)} = ${formatMoney(plan.targetBalanceToday)}`,
+    `${formatMoney(plan.targetBalanceToday)}`,
     `Transaction date: ${formatDisplayDate(plan.actionDate)}.`,
   );
+  if (plan.advanced) {
+    appendStep(
+      "11. Base interest earned across the full month",
+      `${formatMoney(plan.forecast.balanceDays)} balance-days × ${plan.baseInterest.rate} / ${plan.baseInterest.yearDays} = ${formatMoney(plan.forecast.estimatedBaseInterest)} (rounded down to cents)`,
+      "Includes historical balances already represented by current MAB and each projected day after the effective date. No interest is earned on this forecast credit before it posts.",
+    );
+    appendStep(
+      "12. MAB after the final-day credit",
+      `(${formatMoney(plan.forecast.balanceDays)} + ${formatMoney(plan.forecast.estimatedBaseInterest)}) / ${plan.daysInMonth} = ${formatMoney(plan.projectedMab)}`,
+      `MAB rises by ${(plan.forecast.estimatedBaseInterest / plan.daysInMonth).toFixed(4)} SGD because the credit counts for one day.`,
+    );
+  }
 }
 
 function openMathModal() {
@@ -608,6 +682,8 @@ form.addEventListener("submit", (event) => {
 const accountSelect = document.querySelector("#account");
 function syncAccount() {
   const stash = accountSelect.value === "uob-stash";
+  document.querySelector("#advancedToggleLabel").classList.toggle("hidden", !stash);
+  syncAdvanced();
   for (const id of ["previousLabel", "bufferLabel"]) document.querySelector("#" + id).classList.toggle("hidden", !stash);
   for (const id of ["increaseLabel", "goalLabel"]) document.querySelector("#" + id).classList.toggle("hidden", stash);
   document.querySelector("h1").textContent = stash ? "UOB Stash withdrawal calculator" : "MAB goal calculator";
@@ -656,3 +732,15 @@ function syncMabInput() {
     : Number(monthSelect.value) === currentMonthIndex ? "Current MAB (as of yesterday)" : "Current MAB (through effective date)";
   if (hideCurrent) document.querySelector("#currentMab").value = "0";
 }
+
+function syncAdvanced() {
+  const enabled = document.querySelector("#account").value === "uob-stash" && document.querySelector("#advancedStash").checked;
+  document.querySelector("#advancedPanel").classList.toggle("hidden", !enabled);
+  for (const id of ["baseRate", "yearDays", "trialWithdrawal"]) document.querySelector("#" + id).disabled = !enabled;
+}
+
+document.querySelector("#advancedStash").addEventListener("change", () => {
+  syncAdvanced();
+  results.replaceChildren(createElement("div", { className: "placeholder", text: "Calculate again to apply the selected interest mode." }));
+  closeMathModal();
+});

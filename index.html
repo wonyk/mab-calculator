@@ -63,6 +63,20 @@
           <input id="actionDate" name="actionDate" type="date" required>
         </label>
 
+        <label id="advancedToggleLabel" class="date-toggle full-width hidden">
+          <input id="advancedStash" name="advancedStash" type="checkbox" aria-controls="advancedPanel">
+          <span>Advanced: include month-end base interest</span>
+        </label>
+        <section id="advancedPanel" class="planned-panel advanced-panel hidden">
+          <p class="note">Predict base interest after your withdrawal and include its last-day credit in MAB. Enter your current balance after any day-1 bonus has posted; that bonus is not forecast again.</p>
+          <div class="advanced-fields">
+            <label><span>Base interest rate (% p.a.)</span><input id="baseRate" name="baseRate" type="number" min="0" max="100" step="0.001" value="0.05" required disabled></label>
+            <label><span>Interest day-count basis</span><select id="yearDays" name="yearDays" disabled><option value="365">365 days (estimate)</option><option value="366">366 days (estimate)</option></select></label>
+            <label class="full-width"><span>Try a withdrawal amount (S$, optional)</span><input id="trialWithdrawal" name="trialWithdrawal" type="number" min="0" step="0.01" placeholder="Leave empty to use the recommended amount" disabled></label>
+          </div>
+          <p class="note">Assumes the credit posts on the final day and counts in that day’s closing balance. Interest is rounded down to cents; actual bank rounding may differ. Do not also add this month’s base-interest credit as a planned deposit.</p>
+        </section>
+
         <section class="planned-panel">
           <div class="planned-header">
             <div>
