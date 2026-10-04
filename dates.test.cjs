@@ -146,6 +146,7 @@ for (const timestamp of ['2026-10-01T04:00:00Z', '2027-01-01T04:00:00Z']) {
   get('advancedMode').change();
   assert.equal(get('baseRate').disabled, false);
   assert.equal(get('expectedBonus').disabled, false);
+  assert.match(get('bonusForecastHelp').textContent, /optional OCBC bonus/);
   const data = new Map([
     ['account', 'ocbc'], ['month', '9'], ['effectiveDate', '2026-10-03'],
     ['actionDate', '2026-10-04'], ['currentMab', '50000'], ['mabIncrease', '500'],
@@ -209,6 +210,11 @@ for (const timestamp of ['2026-10-01T04:00:00Z', '2027-01-01T04:00:00Z']) {
   get('advancedMode').change();
   assert.equal(get('expectedBonus').disabled, true);
   assert.equal(get('bonusAmountLabel').classList.contains('hidden'), true);
+  assert.doesNotMatch(get('bonusForecastHelp').textContent, /OCBC/);
+  assert.match(get('bonusForecastHelp').textContent, /Include already credited base and bonus interest/);
+  get('account').value = 'ocbc';
+  context.syncAccount();
+  assert.match(get('bonusForecastHelp').textContent, /optional OCBC bonus/);
 }
 console.log('Date selection regressions passed for both accounts and month/year boundaries.');
 console.log('OCBC custom forecast, pending bonus timing and collapsed notes passed.');

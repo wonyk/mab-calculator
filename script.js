@@ -789,6 +789,9 @@ function syncMabInput() {
 function syncAdvanced() {
   const enabled = document.querySelector("#advancedMode").checked;
   const ocbc = document.querySelector("#account").value === "ocbc";
+  document.querySelector("#bonusForecastHelp").textContent = ocbc
+    ? "Already credited interest belongs in your current balance. The optional OCBC bonus is last month's bonus expected to post later this month; it is an entered credit, not earnings from your proposed withdrawal. Do not also enter it as a planned transfer."
+    : "Include already credited base and bonus interest in your current balance, including last month's bonus credited at the start of this month. This forecast predicts this month's base interest only; it does not predict bonus interest.";
   document.querySelector("#advancedPanel").classList.toggle("hidden", !enabled);
   for (const id of ["baseRate", "yearDays", "trialWithdrawal"]) document.querySelector("#" + id).disabled = !enabled;
   for (const id of ["bonusAmountLabel", "bonusDateLabel"]) document.querySelector("#" + id).classList.toggle("hidden", !ocbc);
