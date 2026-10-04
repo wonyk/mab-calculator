@@ -438,6 +438,11 @@ a { color: var(--accent); }
 .advanced-fields { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
 .advanced-panel > p { line-height: 1.6; }
 .forecast-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 1rem; }
+.help-notes { margin-top: 0.8rem; color: var(--muted); line-height: 1.6; }
+.help-notes p { margin: 0.6rem 0; }
+summary { cursor: pointer; font-weight: 600; }
+.result-notes > summary { color: var(--ink); }
+.forecast-heading p { margin: 0.5rem 0 0; color: var(--muted); line-height: 1.6; }
 
 @media (max-width: 720px) {
   .advanced-fields, .forecast-grid { grid-template-columns: 1fr; }

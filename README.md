@@ -18,9 +18,9 @@ The recommendation rounds withdrawals down and deposits up to cents and reserves
 
 Rules verified on 2 October 2026 against [UOB Stash](https://www.uob.com.sg/personal/save/savings-accounts/stash-account.page) and [UOB account terms](https://www.uob.com.sg/web-resources/personal/pdf/personal/save/tnc-cts.pdf), section 41.
 
-## Advanced Stash projection
+## Advanced interest and withdrawal projections
 
-Select **Advanced: include month-end base interest** in UOB Stash mode. The default base rate is 0.05% p.a.; the day-count basis defaults to 365 and can be changed to 366. The rate and month-end accrual timing were rechecked against UOB's product page and account terms on 4 October 2026. The public sources do not specify the denominator or rounding method, so these are explicit estimation assumptions.
+Both accounts open in simple mode, including after switching accounts. Select **Advanced: interest and withdrawal forecast** for Stash or **Advanced (OCBC trial): interest and withdrawal forecast** for OCBC. The default base rate is 0.05% p.a.; the day-count basis defaults to 365 and can be changed to 366. The rate and month-end accrual timing were rechecked against UOB's product page and account terms on 4 October 2026. The public UOB sources do not specify the denominator or rounding method, so these are explicit estimation assumptions.
 
 The forecast includes the entire selected month's daily balance-days: historical MAB multiplied by completed days, then future balances after the recommended move and each planned transfer. It calculates base interest on those balances before the forecast credit, rounds the credit down to cents, and adds it only to the final day's closing balance. The day-1 bonus is already part of the current balance entered by the user and is not forecast separately. Do not also enter the forecast base credit as a planned deposit.
 
@@ -31,9 +31,11 @@ Base interest = floor(S × r / Y × 100) / 100
 Month-end MAB = (S + base interest) / D
 ```
 
-Since the withdrawal changes `S` and therefore interest, the solver finds the minimum deposit or maximum withdrawal at cent precision that preserves the target MAB and buffer after the rounded credit. It also checks that forecast interest cannot finance the withdrawal or earlier planned outflows. Basic mode and OCBC do not use this model.
+Since the withdrawal changes `S` and therefore interest, the solver finds the minimum deposit or maximum withdrawal at cent precision that preserves the target MAB and buffer after the rounded credit. It also checks that forecast interest cannot finance the withdrawal or earlier planned outflows. Simple mode does not forecast future interest.
 
-Results show base interest, MAB before and after the credit, and the extra withdrawal compared with basic mode. An optional trial withdrawal forecasts a user-chosen amount and distinguishes meeting the bank's balance requirement from keeping the selected buffer. The estimate assumes base interest posts on the last day and counts toward that day's MAB; posting and rounding differences can change the actual result.
+An optional custom withdrawal replaces the recommended move for the forecast; it is not added on top. Results explicitly show which move is being forecast, the balance after it, full-month base interest (including interest already accrued on historical balances), MAB before and after the final-day credit, and closing balance. The recommended move stays visible separately. Custom scenarios distinguish meeting the bank's balance requirement from keeping the selected buffer. The estimate assumes base interest posts on the last day and counts toward that day's MAB; posting and rounding differences can change the actual result. Forecast help, transfer guidance, and result notes are collapsed by default and can be expanded.
+
+In the OCBC trial, the target remains the previous month's MAB plus the chosen increase (S$500 by default), with the existing S$10 buffer. You may enter last month's bonus still awaiting credit and its expected posting date within the selected month. It is treated as a future deposit from that date, rather than predicted earnings caused by the custom withdrawal. Do not enter already credited bonus interest here or duplicate it as a planned transfer. Basic mode ignores these optional inputs; Stash hides and disables them. OCBC base interest is truncated to two decimals under clause 2.1 of the [OCBC account terms](https://www.ocbc.com/iwov-resources/sg/ocbc/personal/pdf/accounts/tnc-governing-ocbc-360-account.pdf), verified on 4 October 2026. The OCBC trial models the balance requirement only; it does not determine eligibility for other bonus categories.
 
 Example: a 31-day month starting with S$50,100 and last month's MAB of S$50,000, a S$1 buffer and no planned transfers. Basic mode recommends withdrawing S$99.00 on day 1. Advanced mode predicts S$2.12 base interest and permits S$99.06, leaving S$50,000.94 before the credit and a projected MAB of approximately S$50,001.0084 after it.
 

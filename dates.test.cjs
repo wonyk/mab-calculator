@@ -98,14 +98,14 @@ for (const timestamp of ['2026-10-01T04:00:00Z', '2027-01-01T04:00:00Z']) {
   const { context, get } = load('uob-stash', '2026-10-01T04:00:00Z');
   assert.equal(get('advancedPanel').classList.contains('hidden'), true);
   assert.equal(get('baseRate').disabled, true);
-  get('advancedStash').checked = true;
-  get('advancedStash').change();
+  get('advancedMode').checked = true;
+  get('advancedMode').change();
   assert.equal(get('advancedPanel').classList.contains('hidden'), false);
   assert.equal(get('baseRate').disabled, false);
   const data = new Map([
     ['account', 'uob-stash'], ['month', '9'], ['effectiveDate', '2026-09-30'],
     ['actionDate', '2026-10-01'], ['currentMab', '0'], ['currentBalance', '50100'],
-    ['previousMab', '50000'], ['buffer', '1'], ['advancedStash', 'on'],
+    ['previousMab', '50000'], ['buffer', '1'], ['advancedMode', 'on'],
     ['baseRate', '0.05'], ['yearDays', '365'], ['trialWithdrawal', '100'],
   ]);
   let plan = context.calculatePlan(data);
@@ -120,21 +120,96 @@ for (const timestamp of ['2026-10-01T04:00:00Z', '2027-01-01T04:00:00Z']) {
   assert.ok(plan.trial.error);
   assert.equal(plan.todayTransferAmount, -99.06);
   context.renderResults(plan);
-  data.set('advancedStash', '');
+  data.set('advancedMode', '');
   assert.equal(context.calculatePlan(data).todayTransferAmount, -99);
-  data.set('advancedStash', 'on');
+  data.set('advancedMode', 'on');
   data.set('baseRate', '');
   assert.throws(() => context.calculatePlan(data));
   data.set('account', 'ocbc');
   data.set('mabIncrease', '0');
   data.set('goalIncrease', '500');
   data.set('currentMab', '50000');
-  assert.equal(context.calculatePlan(data).advanced, false);
+  data.set('baseRate', '0.05');
+  data.set('trialWithdrawal', '90');
+  assert.equal(context.calculatePlan(data).advanced, true);
   get('account').value = 'ocbc';
   context.syncAccount();
-  assert.equal(get('advancedToggleLabel').classList.contains('hidden'), true);
+  assert.equal(get('advancedMode').checked, false);
   assert.equal(get('advancedPanel').classList.contains('hidden'), true);
   assert.equal(get('baseRate').disabled, true);
 }
+{
+  const { context, get } = load('ocbc', '2026-10-04T04:00:00Z');
+  assert.equal(get('advancedMode').checked, false);
+  assert.equal(get('advancedPanel').classList.contains('hidden'), true);
+  get('advancedMode').checked = true;
+  get('advancedMode').change();
+  assert.equal(get('baseRate').disabled, false);
+  assert.equal(get('expectedBonus').disabled, false);
+  const data = new Map([
+    ['account', 'ocbc'], ['month', '9'], ['effectiveDate', '2026-10-03'],
+    ['actionDate', '2026-10-04'], ['currentMab', '50000'], ['mabIncrease', '500'],
+    ['currentBalance', '50100'], ['goalIncrease', '500'], ['advancedMode', 'on'],
+    ['baseRate', '0.05'], ['yearDays', '365'], ['trialWithdrawal', '90'],
+    ['expectedBonus', '0'],
+  ]);
+  let plan = context.calculatePlan(data);
+  assert.equal(plan.previousMonthMab, 49500);
+  assert.equal(plan.targetMab, 50000);
+  assert.equal(plan.bufferedTargetMab, 50010);
+  assert.equal(plan.trial.actionBalance, 50010);
+  assert.equal(plan.trial.estimatedBaseInterest, 2.12);
+  assert.equal(plan.trial.balanceDays, 1550280);
+  assert.equal(plan.trial.meetsRequirement, true);
+  assert.equal(plan.trial.meetsTarget, false);
+  context.renderResults(plan);
+  const grid = get('results').children[0];
+  const notes = grid.children[grid.children.length - 1];
+  assert.equal(notes.children[0].textContent, 'Notes and assumptions');
+  assert.ok(!notes.open);
+  assert.equal(grid.children[1].children[0].textContent, 'Forecast after your SGD 90.00 withdrawal');
+  data.set('expectedBonus', '100');
+  data.set('bonusDate', '2026-10-10');
+  plan = context.calculatePlan(data);
+  assert.equal(plan.trial.balanceDays, 1552480);
+  assert.equal(plan.trial.meetsTarget, true);
+  assert.equal(plan.expectedBonus, 100);
+  context.renderResults(plan);
+  context.renderMathBreakdown(plan);
+  data.set('bonusDate', '2026-10-03');
+  assert.throws(() => context.calculatePlan(data), /already credited/);
+  data.set('bonusDate', '2026-11-01');
+  assert.throws(() => context.calculatePlan(data), /selected month/);
+  data.set('advancedMode', '');
+  assert.equal(context.calculatePlan(data).expectedBonus, 0);
+  assert.equal(context.calculatePlan(data).trial, null);
+  data.set('advancedMode', 'on');
+  data.set('expectedBonus', '1000');
+  data.set('bonusDate', '2026-10-05');
+  data.set('actionDate', '2026-10-10');
+  data.set('currentBalance', '1000');
+  get('plannedTransfers').querySelectorAll = () => [{
+    querySelector(selector) {
+      return { value: selector === '.transfer-day' ? '6' : selector === '.transfer-type' ? 'withdrawal' : '1500' };
+    },
+  }];
+  plan = context.calculatePlan(data);
+  assert.equal(plan.basicMove, null);
+  assert.ok(!plan.trial.error);
+  assert.equal(plan.trial.actionBalance, 410);
+  get('plannedTransfers').querySelectorAll = () => [];
+  data.set('actionDate', '2026-10-04');
+  data.set('trialWithdrawal', '1100');
+  assert.match(context.calculatePlan(data).trial.error, /available/);
+  get('account').value = 'uob-stash';
+  context.syncAccount();
+  assert.equal(get('advancedMode').checked, false);
+  assert.equal(get('expectedBonus').disabled, true);
+  get('advancedMode').checked = true;
+  get('advancedMode').change();
+  assert.equal(get('expectedBonus').disabled, true);
+  assert.equal(get('bonusAmountLabel').classList.contains('hidden'), true);
+}
 console.log('Date selection regressions passed for both accounts and month/year boundaries.');
-console.log('Advanced UI toggle, forecast rendering, trial status and OCBC isolation checks passed.');
+console.log('OCBC custom forecast, pending bonus timing and collapsed notes passed.');
+console.log('Both-account advanced forecasts and simple defaults passed.');

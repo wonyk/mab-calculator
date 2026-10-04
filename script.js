@@ -292,6 +292,7 @@ function calculatePlan(formData) {
   const effectiveDate = parseInputDate(formData.get("effectiveDate"));
   const actionDate = parseInputDate(formData.get("actionDate"));
   const isStash = formData.get("account") === "uob-stash";
+  const advanced = formData.get("advancedMode") === "on";
   const goalIncrease = isStash ? 0 : Number(formData.get("goalIncrease") || 500);
   const currentMab = Number(formData.get("currentMab"));
   const mabIncrease = Number(formData.get("mabIncrease"));
@@ -334,6 +335,15 @@ function calculatePlan(formData) {
   const totalAccumulatedSoFar = currentMab * dataDay;
   const actionContributionDays = Math.max(0, daysInMonth - actionDate.getDate() + 1);
 
+  const expectedBonus = advanced && !isStash ? Number(formData.get("expectedBonus") || 0) : 0;
+  if (!Number.isFinite(expectedBonus) || expectedBonus < 0) throw new Error("Enter a valid expected bonus amount.");
+  if (expectedBonus > 0) {
+    const bonusDate = parseInputDate(formData.get("bonusDate"));
+    if (!bonusDate || Number.isNaN(bonusDate.getTime()) || bonusDate.getFullYear() !== currentYear || bonusDate.getMonth() !== monthIndex || bonusDate <= effectiveDate) {
+      throw new Error("Expected bonus posting date must be after the MAB effective date and within the selected month. Include already credited interest in your current balance instead.");
+    }
+    plannedItems.push({ day: bonusDate.getDate(), amount: expectedBonus, signedAmount: expectedBonus, type: "bonus" });
+  }
   plannedItems.forEach((item) => {
     if (!Number.isInteger(item.day) || item.day <= dataDay || item.day > daysInMonth) {
       throw new Error(`Planned transfer days must be between ${dataDay + 1} and ${daysInMonth}.`);
@@ -357,7 +367,6 @@ function calculatePlan(formData) {
   const baseContributionWithoutToday = currentBalance * remainingDays;
   const requiredContributionFromToday = totalBalanceNeeded - totalAccumulatedSoFar;
 
-  const advanced = isStash && formData.get("advancedStash") === "on";
   let baseInterest = null;
   if (advanced) {
     const rateValue = formData.get("baseRate");
@@ -369,7 +378,15 @@ function calculatePlan(formData) {
     baseInterest = { rate, yearDays };
   }
   const solveOptions = { days: daysInMonth, dataDay, actionDay: actionDate.getDate(), currentMab, currentBalance, target: bufferedTargetMab, transfers: plannedItems };
-  const basicPlan = solveMabPlan(solveOptions);
+  let basicPlan;
+  try {
+    basicPlan = solveMabPlan({ ...solveOptions, transfers: plannedItems.filter(item => item.type !== "bonus") });
+  } catch (error) {
+    if (!advanced) throw error;
+    // An entered bonus may fund a planned transfer before the main move.
+    // A comparison without that credit must not block the advanced plan.
+    basicPlan = null;
+  }
   const solved = advanced ? solveMabPlan({ ...solveOptions, baseInterest }) : basicPlan;
   let trial = null;
   const trialValue = formData.get("trialWithdrawal");
@@ -379,7 +396,9 @@ function calculatePlan(formData) {
     try {
       trial = { amount, ...projectMabMove({ ...solveOptions, baseInterest }, -amount) };
       trial.meetsTarget = trial.projectedMab >= bufferedTargetMab - 1e-8;
-      trial.meetsRequirement = trial.projectedMab >= previousMonthMab - 1e-8 && trial.projectedMab > 10000;
+      trial.meetsRequirement = isStash
+        ? trial.projectedMab >= previousMonthMab - 1e-8 && trial.projectedMab > 10000
+        : trial.projectedMab >= targetMab - 1e-8 && trial.projectedMab > 0;
     } catch (error) {
       trial = { amount, error: error.message };
     }
@@ -394,8 +413,9 @@ function calculatePlan(formData) {
     isStash,
     advanced,
     baseInterest,
+    expectedBonus,
     forecast: solved,
-    basicMove: basicPlan.move,
+    basicMove: basicPlan ? basicPlan.move : null,
     trial,
     projectedMab: solved.projectedMab,
     daysInMonth,
@@ -455,7 +475,7 @@ function renderResults(plan) {
   const grid = createElement("div", { className: "results-grid" });
   const primaryResult = createElement("article", { className: "primary-result" });
   primaryResult.append(
-    createElement("strong", { text: plan.isStash && plan.todayTransferAmount < 0 ? "Maximum withdrawal with selected buffer" : `${actionVerb} amount` }),
+    createElement("strong", { text: plan.todayTransferAmount < 0 ? "Recommended maximum withdrawal with buffer" : `Recommended ${actionVerb.toLowerCase()} amount` }),
     createElement("span", { className: `primary-amount ${amountClass}`, text: amountText }),
     createElement("p", { className: "result-caption", text: actionText }),
   );
@@ -469,37 +489,48 @@ function renderResults(plan) {
   showDetailsButton.id = "showDetailsButton";
   actions.append(showDetailsButton);
 
-  const summary = createElement("article", { className: "summary" });
+  const summary = createElement("details", { className: "summary result-notes" });
   const plannedSummary = plan.plannedItems.length > 0
     ? `Future transfers included: ${plan.plannedItems.map((item) => `${item.signedAmount >= 0 ? "credit" : "withdraw"} ${formatMoney(item.amount)} on day ${item.day}`).join(", ")}.`
     : "No planned transfers were included in this calculation.";
   summary.append(
-    createElement("strong", { text: "Notes" }),
+    createElement("summary", { text: "Notes and assumptions" }),
     createElement("p", { text: `This uses values effective on ${formatDisplayDate(plan.effectiveDate)}.` }),
     createElement("p", { text: plannedSummary }),
     createElement("p", { className: "note", text: `Chosen transaction date: ${formatDisplayDate(plan.actionDate)}.` }),
   );
 
-  summary.append(createElement("p", { text: `Projected month-end MAB: ${formatMoney(plan.projectedMab)}. Target including buffer: ${formatMoney(plan.bufferedTargetMab)}.` }));
+  summary.append(createElement("p", { text: `Recommended plan MAB: ${formatMoney(plan.projectedMab)}. Target including buffer: ${formatMoney(plan.bufferedTargetMab)}.` }));
   if (plan.isStash) {
     summary.append(createElement("p", { text: `Previous month MAB: ${formatMoney(plan.previousMonthMab)}. Projected closing balance: ${formatMoney(plan.projectedMonthEndBalance)}.` }));
     summary.append(createElement("p", { text: "The limit applies to this month and the transfers entered. A lower closing balance may require a top-up next month to maintain this month’s MAB. Special promotions and earmarked funds are excluded." }));
   }
   grid.append(primaryResult);
   if (plan.advanced) {
+    const selectedForecast = plan.trial && !plan.trial.error ? plan.trial : plan.forecast;
+    const scenarioHeading = createElement("div", { className: "forecast-heading" });
+    scenarioHeading.append(
+      createElement("strong", { text: plan.trial && !plan.trial.error ? `Forecast after your ${formatMoney(plan.trial.amount)} withdrawal` : "Forecast after the recommended move" }),
+      createElement("p", { text: `On ${formatDisplayDate(plan.actionDate)}, using MAB known through ${formatDisplayDate(plan.effectiveDate)}.` }),
+    );
+    grid.append(scenarioHeading);
     const forecastGrid = createElement("div", { className: "forecast-grid" });
     for (const [label, value] of [
-      ["Predicted month-end base interest", plan.forecast.estimatedBaseInterest],
-      ["MAB before base-interest credit", plan.forecast.mabBeforeInterest],
-      ["MAB including base-interest credit", plan.projectedMab],
-      ["Extra withdrawal allowed by base interest", Math.max(0, plan.basicMove - plan.todayTransferAmount)],
+      ["Predicted full-month base interest", selectedForecast.estimatedBaseInterest],
+      ["Balance after withdrawal / move", selectedForecast.actionBalance],
+      ["Expected MAB before base credit", selectedForecast.mabBeforeInterest],
+      ["Expected MAB after base credit", selectedForecast.projectedMab],
+      ["Expected closing balance", selectedForecast.endBalance],
+      ["Target MAB including buffer", plan.bufferedTargetMab],
     ]) {
       const metric = createElement("article", { className: "metric" });
       metric.append(createElement("strong", { text: label }), createElement("span", { text: formatMoney(value) }));
       forecastGrid.append(metric);
     }
     grid.append(forecastGrid);
-    summary.append(createElement("p", { text: `This recommendation includes estimated base interest at ${(plan.baseInterest.rate * 100).toFixed(3)}% p.a. using ${plan.baseInterest.yearDays} days. The credit affects only the final day's MAB; it cannot fund an earlier withdrawal. Your S$${plan.bufferAmount.toFixed(2)} MAB buffer is retained.` }));
+    summary.append(createElement("p", { text: `Base interest is estimated at ${(plan.baseInterest.rate * 100).toFixed(3)}% p.a. using ${plan.baseInterest.yearDays} days. The credit affects only the final day's MAB; it cannot fund an earlier withdrawal. The recommended move retains your S$${plan.bufferAmount.toFixed(2)} MAB buffer.` }));
+    summary.append(createElement("p", { text: plan.basicMove === null ? "Simple mode cannot fund the entered planned transfers before the transaction date without the pending bonus." : `Simple mode would recommend a signed move of ${formatMoney(plan.basicMove)} without forecast interest credits.` }));
+    if (plan.expectedBonus > 0) summary.append(createElement("p", { text: `Includes an entered future OCBC bonus credit of ${formatMoney(plan.expectedBonus)}. This is last month's expected bonus, not a prediction of earnings from your withdrawal. Its posting date and amount are assumptions.` }));
     if (plan.trial) {
       const trial = createElement("article", { className: "summary" });
       trial.append(createElement("strong", { text: `If you withdraw ${formatMoney(plan.trial.amount)}` }));
@@ -507,12 +538,20 @@ function renderResults(plan) {
         trial.append(createElement("p", { text: plan.trial.error }));
       } else {
         trial.append(
-          createElement("p", { text: `Predicted base interest: ${formatMoney(plan.trial.estimatedBaseInterest)}. Projected MAB including that credit: ${formatMoney(plan.trial.projectedMab)}. Closing balance: ${formatMoney(plan.trial.endBalance)}.` }),
-          createElement("p", { text: plan.trial.meetsTarget ? "Meets last month's MAB and your selected buffer." : plan.trial.meetsRequirement ? "Meets last month's MAB but falls below your selected buffer." : "Falls below the Stash bonus-interest balance requirement." }),
+          createElement("p", { text: plan.trial.meetsTarget ? "Meets the balance target and selected buffer." : plan.trial.meetsRequirement ? "Meets the bank's balance requirement but falls below your selected buffer." : plan.isStash ? "Falls below the Stash bonus-interest balance requirement." : "Falls below the OCBC Save balance-increase requirement." }),
         );
       }
       grid.append(trial);
     }
+  }
+  if (!plan.advanced) {
+    const simpleMetrics = createElement("div", { className: "forecast-grid" });
+    for (const [label, value] of [["Projected month-end MAB", plan.projectedMab], ["Target MAB including buffer", plan.bufferedTargetMab]]) {
+      const metric = createElement("article", { className: "metric" });
+      metric.append(createElement("strong", { text: label }), createElement("span", { text: formatMoney(value) }));
+      simpleMetrics.append(metric);
+    }
+    grid.append(simpleMetrics);
   }
   grid.append(actions, summary);
   results.replaceChildren(grid);
@@ -614,6 +653,13 @@ function renderMathBreakdown(plan) {
       `(${formatMoney(plan.forecast.balanceDays)} + ${formatMoney(plan.forecast.estimatedBaseInterest)}) / ${plan.daysInMonth} = ${formatMoney(plan.projectedMab)}`,
       `MAB rises by ${(plan.forecast.estimatedBaseInterest / plan.daysInMonth).toFixed(4)} SGD because the credit counts for one day.`,
     );
+    if (plan.trial && !plan.trial.error) {
+      appendStep(
+        "13. Custom withdrawal forecast (replaces the recommended move)",
+        `Withdraw ${formatMoney(plan.trial.amount)}: (${formatMoney(plan.trial.balanceDays)} balance-days + ${formatMoney(plan.trial.estimatedBaseInterest)} base credit) / ${plan.daysInMonth} = ${formatMoney(plan.trial.projectedMab)}`,
+        `Closing balance: ${formatMoney(plan.trial.endBalance)}. Uses the same historical MAB and dated transfers as the recommendation.`,
+      );
+    }
   }
 }
 
@@ -636,6 +682,7 @@ useOlderMabInput.addEventListener("change", () => {
   document.querySelector("#effectiveDateLabel").classList.toggle("hidden", !useOlderMabInput.checked);
   syncDates();
   syncMabInput();
+  syncAdvanced();
 });
 effectiveDateInput.addEventListener("change", () => {
   const effectiveDate = parseInputDate(effectiveDateInput.value);
@@ -682,7 +729,11 @@ form.addEventListener("submit", (event) => {
 const accountSelect = document.querySelector("#account");
 function syncAccount() {
   const stash = accountSelect.value === "uob-stash";
-  document.querySelector("#advancedToggleLabel").classList.toggle("hidden", !stash);
+  // Each account opens in simple mode; forecasting always requires opting in.
+  document.querySelector("#advancedMode").checked = false;
+  document.querySelector("#advancedTitle").textContent = stash
+    ? "Advanced: interest and withdrawal forecast"
+    : "Advanced (OCBC trial): interest and withdrawal forecast";
   syncAdvanced();
   for (const id of ["previousLabel", "bufferLabel"]) document.querySelector("#" + id).classList.toggle("hidden", !stash);
   for (const id of ["increaseLabel", "goalLabel"]) document.querySelector("#" + id).classList.toggle("hidden", stash);
@@ -711,6 +762,8 @@ monthSelect.addEventListener("change", () => {
   syncMabInput();
 });
 effectiveDateInput.addEventListener("change", syncMabInput);
+effectiveDateInput.addEventListener("change", syncAdvanced);
+monthSelect.addEventListener("change", syncAdvanced);
 
 function setStashDates() {
   const month = Number(monthSelect.value);
@@ -734,12 +787,19 @@ function syncMabInput() {
 }
 
 function syncAdvanced() {
-  const enabled = document.querySelector("#account").value === "uob-stash" && document.querySelector("#advancedStash").checked;
+  const enabled = document.querySelector("#advancedMode").checked;
+  const ocbc = document.querySelector("#account").value === "ocbc";
   document.querySelector("#advancedPanel").classList.toggle("hidden", !enabled);
   for (const id of ["baseRate", "yearDays", "trialWithdrawal"]) document.querySelector("#" + id).disabled = !enabled;
+  for (const id of ["bonusAmountLabel", "bonusDateLabel"]) document.querySelector("#" + id).classList.toggle("hidden", !ocbc);
+  for (const id of ["expectedBonus", "bonusDate"]) document.querySelector("#" + id).disabled = !enabled || !ocbc;
+  const bonusDate = document.querySelector("#bonusDate");
+  const effectiveDate = parseInputDate(effectiveDateInput.value);
+  if (effectiveDate) bonusDate.min = formatDateForInput(addDays(effectiveDate, 1));
+  bonusDate.max = formatDateForInput(buildMonthDate(Number(monthSelect.value), getSelectedDaysInMonth()));
 }
 
-document.querySelector("#advancedStash").addEventListener("change", () => {
+document.querySelector("#advancedMode").addEventListener("change", () => {
   syncAdvanced();
   results.replaceChildren(createElement("div", { className: "placeholder", text: "Calculate again to apply the selected interest mode." }));
   closeMathModal();
