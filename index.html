@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MAB Goal Calculator</title>
-  <link rel="stylesheet" href="styles.css?v=1.5.0">
+  <link rel="stylesheet" href="styles.css?v=1.6.0">
 </head>
 <body>
   <main class="app-shell">
@@ -42,10 +42,7 @@
           <input id="currentMab" name="currentMab" type="number" min="0" step="0.01" value="0" required>
         </label>
 
-        <label id="increaseLabel">
-          <span>MAB increase vs previous month</span>
-          <input id="mabIncrease" name="mabIncrease" type="number" step="0.01" value="0" required>
-        </label>
+        <label id="previousLabel"><span>Previous month's MAB</span><input id="previousMab" name="previousMab" type="number" min="0" step="0.01" placeholder="Enter last month's completed MAB" required></label>
 
         <label>
           <span>Current balance (including credited interest)</span>
@@ -57,13 +54,20 @@
           <input id="goalIncrease" name="goalIncrease" type="number" min="0" step="0.01" value="500">
         </label>
 
-        <label id="previousLabel" class="hidden"><span>Previous month’s MAB</span><input id="previousMab" name="previousMab" type="number" min="0" step="0.01" value="50000"></label>
-        <label id="bufferLabel" class="hidden"><span>MAB safety buffer (S$)</span><input id="buffer" name="buffer" type="number" min="0" step="0.01" value="1"></label>
+        <label id="bufferLabel"><span>MAB safety buffer (S$)</span><input id="buffer" name="buffer" type="number" min="0" step="0.01" value="1" required></label>
         <label class="full-width">
           <span>Transaction date for this move</span>
           <input id="actionDate" name="actionDate" type="date" required>
         </label>
         <p id="dateSummary" class="date-summary full-width" aria-live="polite"></p>
+        <details id="baselineHelp" class="help-notes full-width">
+          <summary>Use OCBC's displayed increase to set last month's MAB</summary>
+          <p>Enter the bank's increase for the same date as your current MAB. Set this once for the selected month; updating your current figures later keeps this baseline fixed.</p>
+          <div class="advanced-fields">
+            <label><span>Bank-displayed MAB increase</span><input id="mabIncrease" type="number" step="0.01" placeholder="From OCBC, including a minus sign if lower"></label>
+            <button id="setBaselineButton" class="secondary-button" type="button">Set previous month's MAB</button>
+          </div>
+        </details>
 
         <label id="advancedToggleLabel" class="date-toggle full-width">
           <input id="advancedMode" name="advancedMode" type="checkbox" aria-controls="advancedPanel">
@@ -102,11 +106,10 @@
 
     <section id="results" class="card results" aria-live="polite">
       <div class="placeholder">
-        Enter your month, the effective date of the values you have, current MAB,
-        MAB increase versus last month, and current balance.
+        Enter your current figures, last month's completed MAB and current balance.
       </div>
     </section>
-    <footer class="app-footer">Version <span id="appVersion">1.5.0</span></footer>
+    <footer class="app-footer">Version <span id="appVersion">1.6.0</span></footer>
   </main>
 
   <div id="mathModal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="mathModalTitle">
@@ -120,7 +123,7 @@
     </section>
   </div>
 
-  <script src="calculator.js?v=1.5.0"></script>
-  <script src="script.js?v=1.5.0"></script>
+  <script src="calculator.js?v=1.6.0"></script>
+  <script src="script.js?v=1.6.0"></script>
 </body>
 </html>

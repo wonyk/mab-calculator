@@ -10,6 +10,8 @@ The date summary always shows the known MAB date and the proposed transaction da
 
 This is a small browser-based calculator for estimating how much to deposit or withdraw so your Monthly Average Balance (MAB) ends the month slightly above your target increase.
 
+Both accounts use an editable S$1 MAB buffer by default. OCBC now takes the completed previous month's MAB directly and saves that baseline for the selected calculation month and year. It stays fixed when current MAB or balance changes. A collapsed OCBC helper can set it once from `current MAB − bank-displayed increase`; those two figures must cover the same date. The helper's increase is not saved or automatically reused. Legacy OCBC saved figures remain available, but the old unused previous-MAB value is not treated as a confirmed baseline: enter the baseline once after updating. A new month needs its own baseline. On day 1, neither account needs a current-month MAB because there are no completed days.
+
 ## UOB Stash mode
 
 Choose **UOB Stash (Singapore)** in the account selector, or open the same app with `?account=uob-stash` (for example `index.html?account=uob-stash`). OCBC remains the default.
@@ -41,7 +43,7 @@ Since the withdrawal changes `S` and therefore interest, the solver finds the mi
 
 An optional custom withdrawal replaces the recommended move for the forecast; it is not added on top. Results explicitly show which move is being forecast, the balance after it, full-month base interest (including interest already accrued on historical balances), MAB before and after the final-day credit, and closing balance. The recommended move stays visible separately. Custom scenarios distinguish meeting the bank's balance requirement from keeping the selected buffer. The estimate assumes base interest posts on the last day and counts toward that day's MAB; posting and rounding differences can change the actual result. Forecast help, transfer guidance, and result notes are collapsed by default and can be expanded.
 
-In the OCBC trial, the target remains the previous month's MAB plus the chosen increase (S$500 by default), with the existing S$10 buffer. You may enter last month's bonus still awaiting credit and its expected posting date within the selected month. It is treated as a future deposit from that date, rather than predicted earnings caused by the custom withdrawal. Do not enter already credited bonus interest here or duplicate it as a planned transfer. Basic mode ignores these optional inputs; Stash hides and disables them. OCBC base interest is truncated to two decimals under clause 2.1 of the [OCBC account terms](https://www.ocbc.com/iwov-resources/sg/ocbc/personal/pdf/accounts/tnc-governing-ocbc-360-account.pdf), verified on 4 October 2026. The OCBC trial models the balance requirement only; it does not determine eligibility for other bonus categories.
+In the OCBC trial, the target remains the previous month's MAB plus the chosen increase (S$500 by default), with the editable buffer defaulting to S$1. You may enter last month's bonus still awaiting credit and its expected posting date within the selected month. It is treated as a future deposit from that date, rather than predicted earnings caused by the custom withdrawal. Do not enter already credited bonus interest here or duplicate it as a planned transfer. Basic mode ignores these optional inputs; Stash hides and disables them. OCBC base interest is truncated to two decimals under clause 2.1 of the [OCBC account terms](https://www.ocbc.com/iwov-resources/sg/ocbc/personal/pdf/accounts/tnc-governing-ocbc-360-account.pdf), verified on 4 October 2026. The OCBC trial models the balance requirement only; it does not determine eligibility for other bonus categories.
 
 Example: a 31-day month starting with S$50,100 and last month's MAB of S$50,000, a S$1 buffer and no planned transfers. Basic mode recommends withdrawing S$99.00 on day 1. Advanced mode predicts S$2.12 base interest and permits S$99.06, leaving S$50,000.94 before the credit and a projected MAB of approximately S$50,001.0084 after it.
 
@@ -58,7 +60,7 @@ The calculator asks for:
 - the month
 - the effective date of your current values
 - your current MAB as of that effective date
-- the MAB increase compared to the previous month
+- the completed previous month's MAB
 - your current account balance
 - your target increase, which defaults to `500`
 - the date you plan to perform the deposit or withdrawal
@@ -66,7 +68,7 @@ The calculator asks for:
 
 Using those inputs, it:
 
-- estimates the previous month's MAB
+- keeps the entered previous month's MAB fixed while current figures change
 - calculates the target MAB for the current month
 - adds a small buffer above the target
 - works out one main amount to deposit or withdraw on your chosen transaction date
@@ -77,9 +79,9 @@ Using those inputs, it:
 ## Assumptions
 
 - The current MAB is accurate through the effective date you provide.
-- `Previous month MAB = current MAB - MAB increase vs previous month`.
+- The previous month's completed MAB is entered directly. The optional OCBC helper derives it once from matching current MAB and bank-displayed increase figures.
 - The target is the previous month's MAB plus the target increase.
-- OCBC uses a S$10 MAB buffer; Stash uses the editable buffer and S$10,000 bonus threshold.
+- Both accounts use an editable MAB buffer defaulting to S$1; Stash also applies the S$10,000 bonus threshold.
 - The main recommendation is based on the transaction date you choose.
 - Any planned transfers are assumed to happen on the exact days you enter.
 - The chosen transaction date for the main move is separate from planned transfers, and it must be later than the effective date.

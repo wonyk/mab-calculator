@@ -177,17 +177,17 @@ for (const timestamp of ['2026-10-01T04:00:00Z', '2027-01-01T04:00:00Z']) {
   const data = new Map([
     ['account', 'ocbc'], ['month', '9'], ['effectiveDate', '2026-10-03'],
     ['actionDate', '2026-10-04'], ['currentMab', '50000'], ['mabIncrease', '500'],
-    ['currentBalance', '50100'], ['goalIncrease', '500'], ['advancedMode', 'on'],
-    ['baseRate', '0.05'], ['yearDays', '365'], ['trialWithdrawal', '90'],
+    ['currentBalance', '50100'], ['previousMab', '49500'], ['buffer', '1'], ['goalIncrease', '500'], ['advancedMode', 'on'],
+    ['baseRate', '0.05'], ['yearDays', '365'], ['trialWithdrawal', '100'],
     ['expectedBonus', '0'],
   ]);
   let plan = context.calculatePlan(data);
   assert.equal(plan.previousMonthMab, 49500);
   assert.equal(plan.targetMab, 50000);
-  assert.equal(plan.bufferedTargetMab, 50010);
-  assert.equal(plan.trial.actionBalance, 50010);
+  assert.equal(plan.bufferedTargetMab, 50001);
+  assert.equal(plan.trial.actionBalance, 50000);
   assert.equal(plan.trial.estimatedBaseInterest, 2.12);
-  assert.equal(plan.trial.balanceDays, 1550280);
+  assert.equal(plan.trial.balanceDays, 1550000);
   assert.equal(plan.trial.meetsRequirement, true);
   assert.equal(plan.trial.meetsTarget, false);
   context.renderResults(plan);
@@ -195,11 +195,11 @@ for (const timestamp of ['2026-10-01T04:00:00Z', '2027-01-01T04:00:00Z']) {
   const notes = grid.children[grid.children.length - 1];
   assert.equal(notes.children[0].textContent, 'Notes and assumptions');
   assert.ok(!notes.open);
-  assert.equal(grid.children[1].children[0].textContent, 'Forecast after your SGD 90.00 withdrawal');
+  assert.equal(grid.children[1].children[0].textContent, 'Forecast after your SGD 100.00 withdrawal');
   data.set('expectedBonus', '100');
   data.set('bonusDate', '2026-10-10');
   plan = context.calculatePlan(data);
-  assert.equal(plan.trial.balanceDays, 1552480);
+  assert.equal(plan.trial.balanceDays, 1552200);
   assert.equal(plan.trial.meetsTarget, true);
   assert.equal(plan.expectedBonus, 100);
   context.renderResults(plan);
@@ -224,7 +224,7 @@ for (const timestamp of ['2026-10-01T04:00:00Z', '2027-01-01T04:00:00Z']) {
   plan = context.calculatePlan(data);
   assert.equal(plan.basicMove, null);
   assert.ok(!plan.trial.error);
-  assert.equal(plan.trial.actionBalance, 410);
+  assert.equal(plan.trial.actionBalance, 400);
   get('plannedTransfers').querySelectorAll = () => [];
   data.set('actionDate', '2026-10-04');
   data.set('trialWithdrawal', '1100');
@@ -291,7 +291,8 @@ console.log('Both-account advanced forecasts and simple defaults passed.');
   assert.equal(storage.has('mab-calculator.inputs.ocbc'), true);
   ({ get } = load('ocbc', '2026-11-01T04:00:00Z', storage));
   assert.equal(get('currentBalance').value, '61234');
-  assert.equal(get('mabIncrease').value, '100');
+  assert.equal(get('mabIncrease').value, '');
+  assert.equal(get('previousMab').value, '');
   assert.equal(get('actionDate').value, '2026-11-01');
 }
 {
@@ -338,3 +339,88 @@ console.log('Both-account advanced forecasts and simple defaults passed.');
   for (const file of ['styles.css', 'calculator.js', 'script.js']) assert.ok(html.includes(`${file}?v=${version}`));
 }
 console.log('Saved account isolation, refreshed dates, storage failures, inline errors and visible version passed.');
+
+// OCBC's reference month is explicit and cannot drift when current figures change.
+{
+  const storage = new Map([['mab-calculator.inputs.ocbc', JSON.stringify({
+    values: { currentMab: '51000', currentBalance: '51000', mabIncrease: '1000', previousMab: '50000', buffer: '1' },
+    figuresEditedAt: '2026-10-04T04:00:00Z',
+  })]]);
+  let { context, get } = load('ocbc', '2026-10-11T04:00:00Z', storage);
+  assert.equal(get('previousMab').value, '', 'Do not silently reuse the legacy unused previousMab value');
+  assert.equal(get('mabIncrease').value, '', 'Do not reuse a stale bank-displayed increase');
+  assert.equal(get('buffer').value, '1');
+  assert.equal(get('buffer').disabled, false);
+  get('mabIncrease').value = '1000';
+  get('setBaselineButton').listeners.click[0]();
+  assert.equal(get('previousMab').value, '50000.00');
+  assert.equal(JSON.parse(storage.get('mab-calculator.inputs.ocbc')).ocbcBaselines['2026-10'], '50000.00');
+  get('currentMab').value = '50700';
+  get('mab-form').listeners.input[0]({ target: get('currentMab') });
+  assert.equal(get('previousMab').value, '50000.00');
+  const data = new Map([
+    ['account', 'ocbc'], ['month', '9'], ['effectiveDate', '2026-10-10'], ['actionDate', '2026-10-11'],
+    ['currentMab', '50700'], ['currentBalance', '50500'], ['previousMab', get('previousMab').value],
+    ['mabIncrease', '1000'], ['goalIncrease', '500'], ['buffer', '1'],
+  ]);
+  const plan = context.calculatePlan(data);
+  assert.equal(plan.previousMonthMab, 50000);
+  assert.equal(plan.bufferedTargetMab, 50501);
+  ({ context, get } = load('ocbc', '2026-10-12T04:00:00Z', storage));
+  assert.equal(get('previousMab').value, '50000.00');
+  get('month').value = '10';
+  get('month').change();
+  assert.equal(get('previousMab').value, '', 'A different month needs its own confirmed baseline');
+  assert.equal(get('currentMab').required, false);
+  assert.equal(get('baselineHelp').classList.contains('hidden'), true);
+  get('previousMab').value = '50520';
+  get('mab-form').listeners.input[0]({ target: get('previousMab') });
+  get('month').value = '9';
+  get('month').change();
+  assert.equal(get('previousMab').value, '50000.00');
+  get('month').value = '10';
+  get('month').change();
+  assert.equal(get('previousMab').value, '50520');
+  ({ get } = load('ocbc', '2027-10-11T04:00:00Z', storage));
+  assert.equal(get('previousMab').value, '', 'The same month in a new year must not reuse an old baseline');
+  data.delete('previousMab');
+  assert.throws(() => context.calculatePlan(data), error => error.field === 'previousMab');
+}
+{
+  const { get } = load('ocbc', '2026-10-11T04:00:00Z');
+  get('currentMab').value = '100';
+  get('mabIncrease').value = '200';
+  get('setBaselineButton').listeners.click[0]();
+  assert.equal(get('previousMab').value, '');
+  assert.match(get('mabIncrease').children.at(-1).textContent, /increase exceeds/);
+  get('mabIncrease').value = '-50';
+  get('setBaselineButton').listeners.click[0]();
+  assert.equal(get('previousMab').value, '150.00', 'Negative bank-displayed increases are valid');
+}
+// Repeating a maximum withdrawal cannot release the retained MAB buffer.
+for (const advanced of [false, true]) {
+  const { context } = load('ocbc', '2026-10-04T04:00:00Z');
+  const data = new Map([
+    ['account', 'ocbc'], ['month', '9'], ['effectiveDate', '2026-10-03'], ['actionDate', '2026-10-04'],
+    ['currentMab', '51000'], ['currentBalance', '51000'], ['previousMab', '50000'],
+    ['mabIncrease', '1000'], ['goalIncrease', '500'], ['buffer', '1'],
+    ['advancedMode', advanced ? 'on' : ''], ['baseRate', '0.05'], ['yearDays', '365'],
+  ]);
+  const first = context.calculatePlan(data);
+  assert.equal(first.bufferAmount, 1);
+  for (const day of [9, 16, 31]) {
+    const accumulated = 51000 * 3 + first.targetBalanceToday * (day - 4);
+    data.set('currentMab', String(accumulated / (day - 1)));
+    data.set('currentBalance', String(first.targetBalanceToday));
+    data.set('effectiveDate', `2026-10-${String(day - 1).padStart(2, '0')}`);
+    data.set('actionDate', `2026-10-${String(day).padStart(2, '0')}`);
+    const repeated = context.calculatePlan(data);
+    assert.equal(repeated.previousMonthMab, 50000);
+    assert.equal(repeated.bufferedTargetMab, 50501);
+    assert.ok(Math.abs(repeated.todayTransferAmount) <= 0.31, 'Only cent-rounding residuals may be released');
+    assert.ok(repeated.projectedMab >= 50501 - 1e-8);
+  }
+  data.set('currentBalance', String(first.targetBalanceToday + 100));
+  assert.ok(context.calculatePlan(data).todayTransferAmount < -99, 'A real new credit still creates withdrawal room');
+}
+console.log('Fixed OCBC monthly baselines, $1 buffer, legacy storage and repeated withdrawals passed.');
