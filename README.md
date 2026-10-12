@@ -4,6 +4,8 @@ The application version is maintained in [VERSION](./VERSION). Completed checkpo
 
 The page footer shows the version. Styles and scripts use matching version URLs to refresh cached assets when a new version is published.
 
+Amount fields accept pasted bank figures with thousands separators, such as `50,123.45`, for both accounts. Pasting replaces the field's amount and removes the commas before saving or calculating. Negative increases such as `-1,234.56` also work in the OCBC baseline helper; existing nonnegative and whole-cent restrictions still apply to other amounts.
+
 Results lead with the maximum withdrawal or required deposit and the balance to retain immediately after the move. Custom withdrawal forecasts show whether the bank's balance requirement and the selected buffer are met. The predicted interest card also shows the final-day credit's contribution to MAB.
 
 The date summary always shows the known MAB date and the proposed transaction date. Account figures and target/buffer settings are remembered separately for OCBC and UOB in this browser's local storage. A last-edited time helps identify old figures; review them against the refreshed dates before calculating. Reloading restores today's transaction date and yesterday's MAB date and opens simple mode. Custom withdrawals, pending bonus credits, older-date overrides and planned transfers are not saved. **Clear saved values** clears only the selected account and restores its defaults. The calculator continues working if local storage is unavailable.

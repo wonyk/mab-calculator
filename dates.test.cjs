@@ -43,7 +43,7 @@ function load(account, timestamp, storage = new Map()) {
     constructor(...args) { super(...(args.length ? args : [timestamp])); }
   }
   const context = vm.createContext({
-    document, Date: FixedDate, Intl, URL, URLSearchParams,
+    document, Date: FixedDate, Intl, URL, URLSearchParams, Event,
     window: { location: { search: `?account=${account}` }, localStorage: {
       getItem(key) { return storage.get(key) ?? null; },
       setItem(key, value) { storage.set(key, value); },
@@ -424,3 +424,78 @@ for (const advanced of [false, true]) {
   assert.ok(context.calculatePlan(data).todayTransferAmount < -99, 'A real new credit still creates withdrawal room');
 }
 console.log('Fixed OCBC monthly baselines, $1 buffer, legacy storage and repeated withdrawals passed.');
+
+for (const account of ['ocbc', 'uob-stash']) {
+  const storage = new Map();
+  const { context, get } = load(account, '2026-10-12T04:00:00Z', storage);
+  const form = get('mab-form');
+  function paste(id, text) {
+    const input = get(id);
+    input.type = 'number';
+    input.step = '0.01';
+    input.dispatchEvent = event => {
+      assert.equal(event.type, 'input');
+      assert.equal(event.bubbles, true);
+      for (const listener of form.listeners.input) listener({ target: input });
+    };
+    const event = { target: input, clipboardData: { getData: () => text }, prevented: false,
+      preventDefault() { this.prevented = true; } };
+    for (const listener of form.listeners.paste) listener(event);
+    return event.prevented;
+  }
+  assert.equal(paste('currentMab', ' 51,234.56\n'), true);
+  assert.equal(paste('currentBalance', '52,000.00'), true);
+  assert.equal(paste('previousMab', '50,000.00'), true);
+  assert.equal(get('currentMab').value, '51234.56');
+  assert.equal(get('currentBalance').value, '52000.00');
+  assert.match(get('results').children[0].textContent, /Calculate again/);
+  const record = JSON.parse(storage.get(`mab-calculator.inputs.${account}`));
+  assert.equal(record.values.currentMab, '51234.56');
+  assert.equal(record.values.currentBalance, '52000.00');
+  if (account === 'ocbc') assert.equal(record.ocbcBaselines['2026-10'], '50000.00');
+  const data = new Map([
+    ['account', account], ['month', '9'], ['effectiveDate', '2026-10-11'],
+    ['actionDate', '2026-10-12'], ['currentMab', get('currentMab').value],
+    ['currentBalance', get('currentBalance').value], ['previousMab', get('previousMab').value],
+    ['goalIncrease', '500'], ['buffer', '1'],
+  ]);
+  const plan = context.calculatePlan(data);
+  assert.equal(plan.currentMab, 51234.56);
+  assert.equal(plan.previousMonthMab, 50000);
+  assert.ok(Number.isFinite(plan.todayTransferAmount));
+  const restored = load(account, '2026-10-12T04:00:00Z', storage);
+  assert.equal(restored.get('currentBalance').value, '52000.00');
+  assert.equal(restored.get('previousMab').value, '50000.00');
+
+  for (const invalid of ['1,23.45', '50,00', '1,000,', '1,234.56.78', '1,234oops']) {
+    assert.equal(paste('currentBalance', invalid), false, 'Malformed groups must not be reinterpreted');
+    assert.equal(get('currentBalance').value, '52000.00');
+  }
+  assert.equal(paste('currentBalance', '1234.56'), false, 'Ordinary pastes keep native behavior');
+  get('currentBalance').disabled = true;
+  assert.equal(paste('currentBalance', '60,000'), false);
+  get('currentBalance').disabled = false;
+  get('currentBalance').readOnly = true;
+  assert.equal(paste('currentBalance', '60,000'), false);
+  get('currentBalance').readOnly = false;
+  get('advancedMode').checked = true;
+  get('advancedMode').change();
+  assert.equal(paste('trialWithdrawal', '+1,000.50'), true);
+  assert.equal(get('trialWithdrawal').value, '1000.50');
+  if (account === 'ocbc') assert.equal(paste('expectedBonus', '1,234.00'), true);
+  assert.equal(paste('buffer', '1,000.00'), true);
+  assert.equal(paste('transfer-input-amount', '1,234.50'), true, 'Dynamically added transfer amounts accept pastes');
+  const date = get('actionDate');
+  const rate = get('baseRate');
+  date.type = 'date'; rate.type = 'number'; rate.step = '0.001';
+  for (const target of [date, rate]) {
+    for (const listener of form.listeners.paste) listener({ target,
+      clipboardData: { getData: () => '1,234' }, preventDefault() { assert.fail('Only amount inputs normalize commas'); } });
+  }
+  if (account === 'ocbc') {
+    assert.equal(paste('mabIncrease', '-1,234.56'), true);
+    context.setOcBcBaseline();
+    assert.equal(get('previousMab').value, '52469.12');
+  }
+}
+console.log('Comma-separated amount pastes, saved values, baseline helper and calculations passed for both accounts.');

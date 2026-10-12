@@ -940,6 +940,19 @@ function handleInputEdit(event) {
 }
 form.addEventListener("input", handleInputEdit);
 form.addEventListener("change", handleInputEdit);
+// Number inputs discard commas before their input event reaches us. Normalize
+// a pasted bank amount first, keeping native range and whole-cent validation.
+form.addEventListener("paste", event => {
+  const input = event.target;
+  if (input.type !== "number" || input.step !== "0.01" || input.disabled || input.readOnly) return;
+  const pasted = event.clipboardData && event.clipboardData.getData("text").trim();
+  if (!pasted || !/^[+-]?\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(pasted)) return;
+  const normalized = pasted.replace(/,/g, "");
+  if (!Number.isFinite(Number(normalized))) return;
+  event.preventDefault();
+  input.value = normalized.startsWith("+") ? normalized.slice(1) : normalized;
+  input.dispatchEvent(new Event("input", { bubbles: true }));
+});
 
 const accountSelect = document.querySelector("#account");
 function syncAccount() {
