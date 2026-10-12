@@ -947,14 +947,18 @@ function handleInputEdit(event) {
 }
 form.addEventListener("input", handleInputEdit);
 form.addEventListener("change", handleInputEdit);
-// Number inputs discard commas before their input event reaches us. Normalize
-// a pasted bank amount first, keeping native range and whole-cent validation.
+// Number inputs discard bank labels and commas before their input event reaches
+// us. Extract one amount first; never concatenate numbers from separate figures.
 form.addEventListener("paste", event => {
   const input = event.target;
   if (input.type !== "number" || input.step !== "0.01" || input.disabled || input.readOnly) return;
   const pasted = event.clipboardData && event.clipboardData.getData("text").trim();
-  if (!pasted || !/^[+-]?\d{1,3}(?:,\d{3})+(?:\.\d+)?$/.test(pasted)) return;
-  const normalized = pasted.replace(/,/g, "");
+  const amounts = pasted && pasted.match(/[+-]?(?:\d[\d,.]*|[.,]\d[\d,.]*)/g);
+  if (!amounts || amounts.length !== 1) return;
+  const amount = amounts[0];
+  if (!/^[+-]?(?:\d+|\d{1,3}(?:,\d{3})+)(?:\.\d+)?$/.test(amount)) return;
+  if (amount === pasted && !amount.includes(",")) return; // Keep ordinary native pastes.
+  const normalized = amount.replace(/,/g, "");
   if (!Number.isFinite(Number(normalized))) return;
   event.preventDefault();
   input.value = normalized.startsWith("+") ? normalized.slice(1) : normalized;

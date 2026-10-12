@@ -443,8 +443,8 @@ for (const account of ['ocbc', 'uob-stash']) {
     for (const listener of form.listeners.paste) listener(event);
     return event.prevented;
   }
-  assert.equal(paste('currentMab', ' 51,234.56\n'), true);
-  assert.equal(paste('currentBalance', '52,000.00'), true);
+  assert.equal(paste('currentMab', 'SGD 51,234.56Current Month Average Daily Balance'), true);
+  assert.equal(paste('currentBalance', '  SGD\u00a052,000.00\nAvailable balance  '), true);
   assert.equal(paste('previousMab', '50,000.00'), true);
   assert.equal(get('currentMab').value, '51234.56');
   assert.equal(get('currentBalance').value, '52000.00');
@@ -467,9 +467,20 @@ for (const account of ['ocbc', 'uob-stash']) {
   assert.equal(restored.get('currentBalance').value, '52000.00');
   assert.equal(restored.get('previousMab').value, '50000.00');
 
-  for (const invalid of ['1,23.45', '50,00', '1,000,', '1,234.56.78', '1,234oops']) {
+  for (const invalid of ['1,23.45', '50,00', '1,000,', '1,234.56.78', 'SGD .50Balance',
+    'SGD 1,234.56Balance SGD 2,345.67MAB', 'OCBC 360 SGD 1,234.56', 'SGD 1e3', 'SGD 1,23.45Balance']) {
     assert.equal(paste('currentBalance', invalid), false, 'Malformed groups must not be reinterpreted');
     assert.equal(get('currentBalance').value, '52000.00');
+  }
+  for (const [raw, expected] of [
+    ['SGD 3,711.22Current Month Average Daily Balance', '3711.22'],
+    ['SGD 3711.22Current Month Average Daily Balance', '3711.22'],
+    ['S$ 3,711.22', '3711.22'], ['Current Balance SGD 3,711.22', '3711.22'],
+    ['SGD 0.00Available balance', '0.00'], ['SGD 3,711Balance', '3711'],
+  ]) {
+    assert.equal(paste('currentBalance', raw), true);
+    assert.equal(get('currentBalance').value, expected);
+    assert.equal(JSON.parse(storage.get(`mab-calculator.inputs.${account}`)).values.currentBalance, expected);
   }
   assert.equal(paste('currentBalance', '1234.56'), false, 'Ordinary pastes keep native behavior');
   get('currentBalance').disabled = true;
@@ -493,7 +504,7 @@ for (const account of ['ocbc', 'uob-stash']) {
       clipboardData: { getData: () => '1,234' }, preventDefault() { assert.fail('Only amount inputs normalize commas'); } });
   }
   if (account === 'ocbc') {
-    assert.equal(paste('mabIncrease', '-1,234.56'), true);
+    assert.equal(paste('mabIncrease', 'SGD -1,234.56Increase in average daily balance'), true);
     context.setOcBcBaseline();
     assert.equal(get('previousMab').value, '52469.12');
   }

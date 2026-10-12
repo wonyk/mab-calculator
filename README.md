@@ -4,7 +4,7 @@ The application version is maintained in [VERSION](./VERSION). Completed checkpo
 
 The page footer shows the version. Styles and scripts use matching version URLs to refresh cached assets when a new version is published.
 
-Amount fields accept pasted bank figures with thousands separators, such as `50,123.45`, for both accounts. Pasting replaces the field's amount and removes the commas before saving or calculating. Negative OCBC increases such as `-1,234.56` also work; existing nonnegative and whole-cent restrictions still apply to other amounts.
+Amount fields accept pasted bank figures with thousands separators and surrounding labels for both accounts. For example, `SGD 3,711.22Current Month Average Daily Balance` becomes `3711.22`. Pasting replaces the field's amount and removes currency text, labels and commas before saving or calculating. Negative OCBC increases such as `SGD -1,234.56` also work; existing nonnegative and whole-cent restrictions still apply to other amounts. Only a single amount is extracted; malformed separators or copied blocks containing multiple numbers are not combined or reinterpreted.
 
 Results lead with the maximum withdrawal or required deposit and the balance to retain immediately after the move. Custom withdrawal forecasts show whether the bank's balance requirement and the selected buffer are met. The predicted interest card also shows the final-day credit's contribution to MAB.
 
