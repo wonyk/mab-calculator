@@ -95,11 +95,15 @@ function setOcBcBaseline() {
     if (previous < 0) throw inputError("The increase exceeds your current MAB. Check both bank figures; last month's MAB cannot be negative.", "mabIncrease");
     document.querySelector("#previousMab").value = previous.toFixed(2);
     saveAccountInputs("previousMab");
+    document.querySelector("#mabIncrease").value = "";
+    syncMabInput();
     document.querySelector("#baselineHelp").open = false;
     results.replaceChildren(createElement("div", { className: "placeholder", text: `Last month's MAB is set to ${formatMoney(previous)} for ${monthNames[Number(monthSelect.value)]}. Calculate your plan; later changes to current MAB keep this baseline fixed.` }));
+    return true;
   } catch (error) {
     showFieldError(error.field, error.message);
     document.querySelector("#" + error.field).focus();
+    return false;
   }
 }
 
@@ -777,7 +781,7 @@ function renderMathBreakdown(plan) {
 
   appendStep(
     "1. Previous month MAB",
-    `Entered previous MAB: ${formatMoney(plan.previousMonthMab)}`,
+    `Previous month's MAB used: ${formatMoney(plan.previousMonthMab)}`,
   );
   appendStep(
     "2. Target MAB",
@@ -911,6 +915,9 @@ form.addEventListener("submit", (event) => {
     closeMathModal();
     return;
   }
+  if (accountSelect.value === "ocbc" && !document.querySelector("#mabIncrease").disabled && document.querySelector("#previousMab").value.trim() === "") {
+    if (!setOcBcBaseline()) return;
+  }
   try {
     const formData = new FormData(form);
     const plan = calculatePlan(formData);
@@ -1037,9 +1044,22 @@ function syncMabInput() {
     ? "Current MAB (through chosen date)"
     : Number(monthSelect.value) === currentMonthIndex ? "Current MAB (as of yesterday)" : "Current MAB (through effective date)";
   if (hideCurrent) document.querySelector("#currentMab").value = "0";
-  document.querySelector("#baselineHelp").classList.toggle("hidden", stash || atStart);
+  const previous = document.querySelector("#previousMab");
+  const hasBaseline = previous.value.trim() !== "" && Number.isFinite(Number(previous.value)) && Number(previous.value) >= 0;
+  document.querySelector("#previousLabel").classList.toggle("hidden", !stash && !atStart);
+  previous.required = stash || atStart;
+  document.querySelector("#increaseLabel").classList.toggle("hidden", stash || atStart);
+  document.querySelector("#baselineHelp").classList.toggle("hidden", stash || atStart || !hasBaseline);
   document.querySelector("#mabIncrease").disabled = stash || atStart;
-  document.querySelector("#previousLabel span").textContent = `Previous month's MAB (${monthNames[(Number(monthSelect.value) + 11) % 12]})`;
+  document.querySelector("#mabIncrease").required = !stash && !atStart && !hasBaseline;
+  document.querySelector("#increaseLabel span").textContent = `MAB increase vs previous month${hasBaseline ? " (optional)" : ""}`;
+  document.querySelector("#baselineInputHelp").textContent = hasBaseline
+    ? "Baseline saved. Leave empty for later calculations; use Review or update below to correct it."
+    : "Copy the increase for the same date as your current MAB. Calculate sets this month's baseline automatically.";
+  document.querySelector("#baselineSummary").textContent = hasBaseline ? `Saved previous month's MAB: ${formatMoney(Number(previous.value))}. This stays fixed for ${monthNames[Number(monthSelect.value)]}.` : "";
+  document.querySelector("#previousLabel span").textContent = !stash && atStart
+    ? `MAB as of ${formatDisplayDate(buildMonthDate(Number(monthSelect.value), 0))} (completed previous month)`
+    : `Previous month's MAB (${monthNames[(Number(monthSelect.value) + 11) % 12]})`;
 }
 
 function syncAdvanced() {

@@ -499,3 +499,81 @@ for (const account of ['ocbc', 'uob-stash']) {
   }
 }
 console.log('Comma-separated amount pastes, saved values, baseline helper and calculations passed for both accounts.');
+
+// OCBC users can calculate using only figures available on their banking page.
+{
+  const storage = new Map();
+  let app = load('ocbc', '2026-10-12T04:00:00Z', storage);
+  let captured;
+  function wireSubmit({ context, get }) {
+    context.FormData = function () {
+      return new Map(['account', 'month', 'effectiveDate', 'actionDate', 'currentMab',
+        'currentBalance', 'previousMab', 'goalIncrease', 'buffer'].map(id => [id, get(id).value]));
+    };
+    const render = context.renderResults;
+    context.renderResults = plan => { captured = plan; render(plan); };
+    return () => get('mab-form').listeners.submit[0]({ preventDefault() {} });
+  }
+  let submit = wireSubmit(app);
+  let { get, context } = app;
+  assert.equal(get('previousLabel').classList.contains('hidden'), true);
+  assert.equal(get('previousMab').required, false);
+  assert.equal(get('increaseLabel').classList.contains('hidden'), false);
+  assert.equal(get('mabIncrease').required, true);
+  get('currentMab').value = '51000';
+  get('currentBalance').value = '51000';
+  submit();
+  assert.equal(get('previousMab').value, '', 'Missing increase cannot create a zero baseline');
+  assert.equal(get('mabIncrease').attributes['aria-invalid'], 'true');
+  get('mabIncrease').value = '1000';
+  submit();
+  assert.equal(captured.previousMonthMab, 50000);
+  assert.equal(captured.bufferedTargetMab, 50501);
+  assert.equal(get('mabIncrease').value, '', 'Do not retain a bank increase for later reuse');
+  assert.equal(get('mabIncrease').required, false);
+  assert.equal(get('baselineHelp').classList.contains('hidden'), false);
+  assert.match(get('baselineSummary').textContent, /50,000.00.*fixed for October/);
+  assert.equal(JSON.parse(storage.get('mab-calculator.inputs.ocbc')).ocbcBaselines['2026-10'], '50000.00');
+
+  // Even supplying the old increase again cannot silently lower the target.
+  get('currentMab').value = '50700';
+  get('currentBalance').value = '50500';
+  get('mabIncrease').value = '1000';
+  submit();
+  assert.equal(captured.previousMonthMab, 50000);
+  assert.equal(captured.bufferedTargetMab, 50501);
+  app = load('ocbc', '2026-10-13T04:00:00Z', storage);
+  ({ get, context } = app);
+  submit = wireSubmit(app);
+  assert.equal(get('mabIncrease').value, '');
+  assert.equal(get('mabIncrease').required, false);
+  submit();
+  assert.equal(captured.previousMonthMab, 50000, 'Saved baseline supports later calculations without an increase');
+
+  // A deliberate correction requires the explicit update button.
+  get('currentMab').value = '50700';
+  get('mabIncrease').value = '600';
+  get('setBaselineButton').listeners.click[0]();
+  submit();
+  assert.equal(captured.previousMonthMab, 50100);
+  assert.equal(captured.bufferedTargetMab, 50601);
+  get('month').value = '10';
+  get('month').change();
+  assert.equal(get('previousMab').required, true);
+  assert.equal(get('previousLabel').classList.contains('hidden'), false);
+  assert.match(get('previousLabel span').textContent, /31 Oct 2026.*completed previous month/);
+  assert.equal(get('increaseLabel').classList.contains('hidden'), true);
+  assert.equal(get('mabIncrease').required, false);
+  get('previousMab').value = '50500';
+  submit();
+  assert.equal(captured.previousMonthMab, 50500);
+  assert.equal(captured.dataDay, 0);
+  // Switching to UOB still shows its directly available previous-month MAB.
+  get('account').value = 'uob-stash';
+  context.syncAccount();
+  assert.equal(get('previousLabel').classList.contains('hidden'), false);
+  assert.equal(get('previousMab').required, true);
+  assert.equal(get('increaseLabel').classList.contains('hidden'), true);
+  assert.equal(get('mabIncrease').disabled, true);
+}
+console.log('OCBC bank-display inputs, automatic baseline, explicit correction, reloads and day-one flow passed.');

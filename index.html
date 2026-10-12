@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>MAB Goal Calculator</title>
-  <link rel="stylesheet" href="styles.css?v=1.6.1">
+  <link rel="stylesheet" href="styles.css?v=1.6.2">
 </head>
 <body>
   <main class="app-shell">
@@ -43,6 +43,11 @@
         </label>
 
         <label id="previousLabel"><span>Previous month's MAB</span><input id="previousMab" name="previousMab" type="number" min="0" step="0.01" placeholder="Enter last month's completed MAB" required></label>
+        <label id="increaseLabel">
+          <span>MAB increase vs previous month</span>
+          <input id="mabIncrease" type="number" step="0.01" placeholder="Copy OCBC's increase, including a minus sign if lower">
+          <small id="baselineInputHelp"></small>
+        </label>
 
         <label>
           <span>Current balance (including credited interest)</span>
@@ -61,12 +66,10 @@
         </label>
         <p id="dateSummary" class="date-summary full-width" aria-live="polite"></p>
         <details id="baselineHelp" class="help-notes full-width">
-          <summary>Use OCBC's displayed increase to set last month's MAB</summary>
-          <p>Enter the bank's increase for the same date as your current MAB. Set this once for the selected month; updating your current figures later keeps this baseline fixed.</p>
-          <div class="advanced-fields">
-            <label><span>Bank-displayed MAB increase</span><input id="mabIncrease" type="number" step="0.01" placeholder="From OCBC, including a minus sign if lower"></label>
-            <button id="setBaselineButton" class="secondary-button" type="button">Set previous month's MAB</button>
-          </div>
+          <summary>Review or update the OCBC baseline</summary>
+          <p id="baselineSummary"></p>
+          <p>To correct it, enter a fresh current MAB and displayed increase for the same date above, then update. Updating current figures alone keeps the baseline fixed.</p>
+          <button id="setBaselineButton" class="secondary-button" type="button">Update baseline from current figures</button>
         </details>
 
         <label id="advancedToggleLabel" class="date-toggle full-width">
@@ -109,7 +112,7 @@
         Enter your current figures, last month's completed MAB and current balance.
       </div>
     </section>
-    <footer class="app-footer">Version <span id="appVersion">1.6.1</span></footer>
+    <footer class="app-footer">Version <span id="appVersion">1.6.2</span></footer>
   </main>
 
   <div id="mathModal" class="modal hidden" aria-hidden="true" role="dialog" aria-labelledby="mathModalTitle">
@@ -123,7 +126,7 @@
     </section>
   </div>
 
-  <script src="calculator.js?v=1.6.1"></script>
-  <script src="script.js?v=1.6.1"></script>
+  <script src="calculator.js?v=1.6.2"></script>
+  <script src="script.js?v=1.6.2"></script>
 </body>
 </html>

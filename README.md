@@ -4,7 +4,7 @@ The application version is maintained in [VERSION](./VERSION). Completed checkpo
 
 The page footer shows the version. Styles and scripts use matching version URLs to refresh cached assets when a new version is published.
 
-Amount fields accept pasted bank figures with thousands separators, such as `50,123.45`, for both accounts. Pasting replaces the field's amount and removes the commas before saving or calculating. Negative increases such as `-1,234.56` also work in the OCBC baseline helper; existing nonnegative and whole-cent restrictions still apply to other amounts.
+Amount fields accept pasted bank figures with thousands separators, such as `50,123.45`, for both accounts. Pasting replaces the field's amount and removes the commas before saving or calculating. Negative OCBC increases such as `-1,234.56` also work; existing nonnegative and whole-cent restrictions still apply to other amounts.
 
 Results lead with the maximum withdrawal or required deposit and the balance to retain immediately after the move. Custom withdrawal forecasts show whether the bank's balance requirement and the selected buffer are met. The predicted interest card also shows the final-day credit's contribution to MAB.
 
@@ -12,7 +12,7 @@ The date summary always shows the known MAB date and the proposed transaction da
 
 This is a small browser-based calculator for estimating how much to deposit or withdraw so your Monthly Average Balance (MAB) ends the month slightly above your target increase.
 
-Both accounts use an editable S$1 MAB buffer by default. OCBC now takes the completed previous month's MAB directly and saves that baseline for the selected calculation month and year. It stays fixed when current MAB or balance changes. A collapsed OCBC helper can set it once from `current MAB − bank-displayed increase`; those two figures must cover the same date. The helper's increase is not saved or automatically reused. Legacy OCBC saved figures remain available, but the old unused previous-MAB value is not treated as a confirmed baseline: enter the baseline once after updating. A new month needs its own baseline. On day 1, neither account needs a current-month MAB because there are no completed days.
+Both accounts use an editable S$1 MAB buffer by default. OCBC's main inputs match its banking display: current MAB and increase versus the previous month. The first calculation derives the previous month's MAB from `current MAB − bank-displayed increase` and saves it for the selected calculation month and year; the two bank figures must cover the same date. Later calculations keep this baseline fixed and can leave the increase blank. Entering another increase alone does not reset it: use the collapsed **Review or update the OCBC baseline** option to apply a correction from fresh matching figures. The increase is not saved or automatically reused. Existing confirmed baselines are preserved; legacy unused previous-MAB defaults are not treated as confirmed. A new month needs its own baseline. On day 1, neither account needs a current-month MAB because there are no completed days; OCBC instead asks for the MAB through the preceding month's final day, which is that completed month's baseline.
 
 ## UOB Stash mode
 
@@ -62,7 +62,7 @@ The calculator asks for:
 - the month
 - the effective date of your current values
 - your current MAB as of that effective date
-- the completed previous month's MAB
+- OCBC's displayed MAB increase (first calculation each month), or UOB's completed previous month's MAB
 - your current account balance
 - your target increase, which defaults to `500`
 - the date you plan to perform the deposit or withdrawal
@@ -70,7 +70,7 @@ The calculator asks for:
 
 Using those inputs, it:
 
-- keeps the entered previous month's MAB fixed while current figures change
+- keeps the derived or entered previous month's MAB fixed while current figures change
 - calculates the target MAB for the current month
 - adds a small buffer above the target
 - works out one main amount to deposit or withdraw on your chosen transaction date
@@ -81,7 +81,7 @@ Using those inputs, it:
 ## Assumptions
 
 - The current MAB is accurate through the effective date you provide.
-- The previous month's completed MAB is entered directly. The optional OCBC helper derives it once from matching current MAB and bank-displayed increase figures.
+- UOB's previous month's completed MAB is entered directly. OCBC derives it once from matching current MAB and bank-displayed increase figures, then saves it; on day 1, the preceding final day's MAB is entered directly.
 - The target is the previous month's MAB plus the target increase.
 - Both accounts use an editable MAB buffer defaulting to S$1; Stash also applies the S$10,000 bonus threshold.
 - The main recommendation is based on the transaction date you choose.
