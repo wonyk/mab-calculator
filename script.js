@@ -95,7 +95,6 @@ function setOcBcBaseline() {
     if (previous < 0) throw inputError("The increase exceeds your current MAB. Check both bank figures; last month's MAB cannot be negative.", "mabIncrease");
     document.querySelector("#previousMab").value = previous.toFixed(2);
     saveAccountInputs("previousMab");
-    document.querySelector("#mabIncrease").value = "";
     syncMabInput();
     document.querySelector("#baselineHelp").open = false;
     results.replaceChildren(createElement("div", { className: "placeholder", text: `Last month's MAB is set to ${formatMoney(previous)} for ${monthNames[Number(monthSelect.value)]}. Calculate your plan; later changes to current MAB keep this baseline fixed.` }));

@@ -540,7 +540,7 @@ console.log('Comma-separated amount pastes, saved values, baseline helper and ca
   submit();
   assert.equal(captured.previousMonthMab, 50000);
   assert.equal(captured.bufferedTargetMab, 50501);
-  assert.equal(get('mabIncrease').value, '', 'Do not retain a bank increase for later reuse');
+  assert.equal(get('mabIncrease').value, '1000', 'Calculating keeps the entered increase visible');
   assert.equal(get('mabIncrease').required, false);
   assert.equal(get('baselineHelp').classList.contains('hidden'), false);
   assert.match(get('baselineSummary').textContent, /50,000.00.*fixed for October/);
@@ -553,6 +553,7 @@ console.log('Comma-separated amount pastes, saved values, baseline helper and ca
   submit();
   assert.equal(captured.previousMonthMab, 50000);
   assert.equal(captured.bufferedTargetMab, 50501);
+  assert.equal(get('mabIncrease').value, '1000', 'Repeated calculations preserve the visible increase without shifting the baseline');
   app = load('ocbc', '2026-10-13T04:00:00Z', storage);
   ({ get, context } = app);
   submit = wireSubmit(app);
@@ -565,6 +566,7 @@ console.log('Comma-separated amount pastes, saved values, baseline helper and ca
   get('currentMab').value = '50700';
   get('mabIncrease').value = '600';
   get('setBaselineButton').listeners.click[0]();
+  assert.equal(get('mabIncrease').value, '600', 'Explicit baseline corrections keep their source figure visible');
   submit();
   assert.equal(captured.previousMonthMab, 50100);
   assert.equal(captured.bufferedTargetMab, 50601);
